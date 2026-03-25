@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Dark warm background -->
+  <rect width="32" height="32" rx="7" fill="#1b1815"/>
+
+  <!-- Left quotation mark: rounded pill body + small tail -->
+  <rect x="6" y="8" width="6" height="9" rx="3" fill="#D4AF37"/>
+  <path d="M 6 15 L 7 21 L 11 18 Z" fill="#D4AF37"/>
+
+  <!-- Right quotation mark: rounded pill body + small tail -->
+  <rect x="15" y="8" width="6" height="9" rx="3" fill="#D4AF37"/>
+  <path d="M 15 15 L 16 21 L 20 18 Z" fill="#D4AF37"/>
+</svg>
