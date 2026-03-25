@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
         },
       },
       {
-        text: 'Extract all text from this image exactly as written. Return only the raw text with no commentary, formatting, or explanation. Preserve line breaks. If the image contains Arabic text, return it as-is.',
+        text: 'Extract all the text from this image exactly as it appears. Maintain the paragraph structure. Do not summarize, do not translate, and do not add any external commentary. Only output the text. Preserve line breaks.',
       },
     ])
 

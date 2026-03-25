@@ -24,7 +24,9 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  // getSession reads the JWT from the cookie with no network call — much faster than getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user ?? null
   const path = request.nextUrl.pathname
 
   // Redirect unauthenticated users away from protected pages

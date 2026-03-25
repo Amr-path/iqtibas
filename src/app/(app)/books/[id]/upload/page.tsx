@@ -223,6 +223,7 @@ export default function UploadPage() {
     e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files)
   }, [addFiles])
 
+  /* Add to pending list (for display) */
   const addPending = (imgId: string, text: string) => {
     const clean = text.trim().replace(/\s+/g, ' ')
     if (!clean) return
@@ -236,40 +237,56 @@ export default function UploadPage() {
       i.id === imgId ? { ...i, pending: i.pending.filter((_, j) => j !== idx) } : i
     ))
 
-  /* ── Save all pending quotes for one image ── */
-  async function saveAll(imgId: string) {
+  /* ── Save a single quote immediately (auto-save on select) ── */
+  async function saveQuoteNow(imgId: string, rawText: string) {
+    const clean = rawText.trim().replace(/\s+/g, ' ')
+    if (!clean) return
     const img = images.find(i => i.id === imgId)
-    if (!img || img.pending.length === 0) return
+    if (!img) return
 
-    let saved = 0
-    for (const text of img.pending) {
-      const payload: Record<string, unknown> = {
-        user_id: user!.id, book_id: bookId,
-        text, tags: [], is_favorite: false,
-      }
-      if (img.dbImageId) payload.image_id = img.dbImageId
-      const { error } = await supabase.from('quotes').insert(payload)
-      if (!error) {
-        await supabase.rpc('increment_quotes_count', { p_user_id: user!.id, p_book_id: bookId })
-        saved++
-      } else {
-        console.error('Quote insert error:', JSON.stringify(error))
-      }
+    // Optimistic: add to pending list first so it appears instantly
+    addPending(imgId, clean)
+
+    const payload: Record<string, unknown> = {
+      user_id: user!.id, book_id: bookId,
+      text: clean, tags: [], is_favorite: false,
     }
-    if (saved === 0) { toast.error(lang === 'ar' ? 'تعذّر حفظ الاقتباسات' : 'Failed to save'); return }
-    toast.success(lang === 'ar' ? `✓ حُفظ ${saved} اقتباس` : `✓ ${saved} saved`)
+    if (img.dbImageId) payload.image_id = img.dbImageId
+    const { error } = await supabase.from('quotes').insert(payload)
+    if (error) {
+      console.error('Quote insert error:', JSON.stringify(error))
+      // Remove optimistic entry
+      setImages(prev => prev.map(i =>
+        i.id === imgId ? { ...i, pending: i.pending.filter(p => p !== clean) } : i
+      ))
+      toast.error(lang === 'ar' ? 'تعذّر حفظ الاقتباس' : 'Failed to save')
+      return
+    }
+    await supabase.rpc('increment_quotes_count', { p_user_id: user!.id, p_book_id: bookId })
     dispatchStatsChanged()
+    // Move from pending to savedCount
     setImages(prev => prev.map(i =>
-      i.id === imgId ? { ...i, pending: [], savedCount: i.savedCount + saved } : i
+      i.id === imgId
+        ? { ...i, pending: i.pending.filter(p => p !== clean), savedCount: i.savedCount + 1 }
+        : i
     ))
   }
 
-  const totalPending   = images.reduce((s, i) => s + i.pending.length, 0)
+  // Split images into: newly uploaded (not from DB) vs existing (from DB/inbox for processing)
+  const newImages      = images.filter(i => !i.isExisting)
+  const existingImages = images.filter(i => i.isExisting)
+
   const totalSaved     = images.reduce((s, i) => s + i.savedCount, 0)
-  const unprocessed    = images.filter(i => i.savedCount === 0 && i.ocrStatus !== 'scanning').length
-  const ocrDone        = images.filter(i => i.ocrStatus === 'done' || i.ocrStatus === 'error').length
-  const ocrInProgress  = images.some(i => i.ocrStatus === 'scanning' || i.ocrStatus === 'idle')
-  const ocrPct         = images.length > 0 ? Math.round((ocrDone / images.length) * 100) : 0
+  // New images are "busy" until both upload AND ocr finish
+  const newUploading   = newImages.some(i =>
+    i.uploadStatus === 'uploading' || i.uploadStatus === 'idle' ||
+    i.ocrStatus    === 'scanning'  || i.ocrStatus    === 'idle'
+  )
+  const newUploadDone  = newImages.length > 0 && newImages.every(i =>
+    (i.uploadStatus === 'done' || i.uploadStatus === 'error') &&
+    (i.ocrStatus    === 'done' || i.ocrStatus    === 'error')
+  )
+  const ocrInProgress  = existingImages.some(i => i.ocrStatus === 'scanning')
 
   return (
     <>
@@ -303,53 +320,84 @@ export default function UploadPage() {
           onChange={e => { if (e.target.files) addFiles(e.target.files); e.target.value = '' }} />
       </div>
 
-      {images.length > 0 && (
-        <>
-          {/* Summary + Progress */}
-          <div style={{
-            marginBottom: 16, padding: '12px 16px',
-            background: 'var(--surface)', border: '1px solid var(--border-light)',
-            borderRadius: 'var(--r-md)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: ocrInProgress ? 8 : 0 }}>
-              <div style={{ display: 'flex', gap: 14, fontSize: '.8rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                {/* OCR counter */}
-                <span style={{ fontWeight: 600, color: ocrInProgress ? 'var(--gold)' : 'var(--green)' }}>
-                  {ocrInProgress
-                    ? (lang === 'ar' ? `⟳ ${ocrDone}/${images.length} تمت معالجتها` : `⟳ ${ocrDone}/${images.length} processed`)
-                    : (lang === 'ar' ? `✓ ${ocrDone}/${images.length} تمت المعالجة` : `✓ ${ocrDone}/${images.length} processed`)}
+      {/* ── Newly uploaded images (simple status view — no processing UI) ── */}
+      {newImages.length > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          {/* Upload progress bar */}
+          {newUploading && (
+            <div style={{ marginBottom: 12, padding: '10px 14px', background: 'var(--surface)', border: '1px solid var(--border-light)', borderRadius: 'var(--r-md)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <span className="spinner" style={{ width: 14, height: 14, borderTopColor: 'var(--gold)', flexShrink: 0 }} />
+                <span style={{ fontSize: '.8rem', fontWeight: 600, color: 'var(--gold)' }}>
+                  {lang === 'ar' ? 'جارٍ رفع الصور...' : 'Uploading images...'}
                 </span>
-                {totalSaved > 0 && <span style={{ color: 'var(--green)' }}>· {totalSaved} {lang === 'ar' ? 'محفوظ' : 'saved'}</span>}
-                {totalPending > 0 && <span style={{ color: 'var(--gold)' }}>· {totalPending} {lang === 'ar' ? 'انتظار' : 'pending'}</span>}
               </div>
-              <button onClick={() => setImages([])}
-                style={{ fontSize: '.75rem', color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
-                {t('removeAll')}
-              </button>
             </div>
-            {/* Progress bar — only while processing */}
-            {ocrInProgress && (
-              <div style={{ height: 4, background: 'var(--border-light)', borderRadius: 99, overflow: 'hidden' }}>
-                <div style={{
-                  height: '100%', borderRadius: 99,
-                  background: 'var(--gold)',
-                  width: `${ocrPct}%`,
-                  transition: 'width 0.4s ease',
-                }} />
-              </div>
-            )}
-          </div>
+          )}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {images.map(img => (
-              <ImageCard key={img.id} img={img} lang={lang}
+          {/* Success banner after all uploaded */}
+          {newUploadDone && (
+            <div style={{
+              marginBottom: 12, padding: '12px 16px',
+              background: 'var(--gold-bg)', border: '1px solid var(--gold-border)',
+              borderRadius: 'var(--r-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <span style={{ fontSize: '.85rem', fontWeight: 600, color: 'var(--gold)' }}>
+                ✓ {lang === 'ar'
+                  ? `${newImages.length} صورة محفوظة — يمكنك الخروج والمعالجة لاحقًا من الصندوق`
+                  : `${newImages.length} image${newImages.length > 1 ? 's' : ''} saved — you can leave and process later from Inbox`}
+              </span>
+            </div>
+          )}
+
+          {/* Thumbnail grid for new uploads */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10 }}>
+            {newImages.map(img => (
+              <UploadThumb key={img.id} img={img} lang={lang}
                 onRemove={() => setImages(prev => {
                   URL.revokeObjectURL(prev.find(i => i.id === img.id)?.preview || '')
                   return prev.filter(i => i.id !== img.id)
                 })}
-                onAddPending={text => addPending(img.id, text)}
+              />
+            ))}
+          </div>
+
+          <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <button onClick={() => fileRef.current?.click()}
+              style={{ fontSize: '.88rem', color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+              + {t('addMoreImgs')}
+            </button>
+            <button onClick={() => router.push(`/books/${bookId}`)} className="btn btn-gold">
+              {t('doneBtn')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Existing unprocessed images (full processing UI — from Inbox) ── */}
+      {existingImages.length > 0 && (
+        <>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: '.8rem', fontWeight: 600, color: 'var(--text-2)', marginBottom: 2 }}>
+              {lang === 'ar' ? 'الصور بانتظار الاستخلاص' : 'Images pending extraction'}
+            </div>
+            <div style={{ fontSize: '.72rem', color: 'var(--text-3)' }}>
+              {lang === 'ar' ? 'ظلّل النص ثم اضغط إضافة لحفظ اقتباس' : 'Highlight text then press Add to save a quote'}
+            </div>
+          </div>
+
+          {ocrInProgress && (
+            <div style={{ marginBottom: 12, height: 3, background: 'var(--border-light)', borderRadius: 99, overflow: 'hidden' }}>
+              <div style={{ height: '100%', borderRadius: 99, background: 'var(--gold)', width: '60%', animation: 'pulse 1.5s ease-in-out infinite' }} />
+            </div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {existingImages.map(img => (
+              <ImageCard key={img.id} img={img} lang={lang}
+                onRemove={() => setImages(prev => prev.filter(i => i.id !== img.id))}
+                onAddPending={text => saveQuoteNow(img.id, text)}
                 onRemovePending={idx => removePending(img.id, idx)}
-                onSaveAll={() => saveAll(img.id)}
                 onRetryOcr={() => runOcr(img.id, img.file, img.dbImageId)}
                 onTextEdit={newText => setImages(prev => prev.map(i => i.id === img.id ? { ...i, ocrText: newText } : i))}
               />
@@ -357,20 +405,12 @@ export default function UploadPage() {
           </div>
 
           <div style={{ marginTop: 28, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <button onClick={() => fileRef.current?.click()}
-              style={{ fontSize: '.88rem', color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
-              + {t('addMoreImgs')}
+            <span style={{ fontSize: '.78rem', color: 'var(--text-3)' }}>
+              {totalSaved > 0 && (lang === 'ar' ? `${totalSaved} اقتباس محفوظ` : `${totalSaved} quote${totalSaved > 1 ? 's' : ''} saved`)}
+            </span>
+            <button onClick={() => router.push(`/books/${bookId}`)} className="btn btn-gold">
+              {t('doneBtn')}
             </button>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              {unprocessed > 0 && (
-                <span style={{ fontSize: '.72rem', color: 'var(--text-3)' }}>
-                  {lang === 'ar' ? `${unprocessed} صورة ستُحفظ في الصندوق` : `${unprocessed} saved to inbox`}
-                </span>
-              )}
-              <button onClick={() => router.push(`/books/${bookId}`)} className="btn btn-gold">
-                {t('doneBtn')}
-              </button>
-            </div>
           </div>
         </>
       )}
@@ -379,19 +419,61 @@ export default function UploadPage() {
 }
 
 /* ═══════════════════════════════════════ */
-function ImageCard({ img, lang, onRemove, onAddPending, onRemovePending, onSaveAll, onRetryOcr, onTextEdit }: {
+/* Simple thumbnail for newly uploaded images (no OCR/quote UI) */
+function UploadThumb({ img, lang, onRemove }: {
+  img: ImageItem; lang: string; onRemove: () => void
+}) {
+  const uploading = img.uploadStatus === 'uploading' || img.uploadStatus === 'idle'
+  const error     = img.uploadStatus === 'error'
+
+  return (
+    <div style={{ position: 'relative', borderRadius: 'var(--r-md)', overflow: 'hidden', background: 'var(--surface-2)', aspectRatio: '1', border: '1px solid var(--border-light)' }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={img.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: uploading ? 0.5 : 1, transition: 'opacity .3s' }} />
+
+      {/* Overlay while uploading */}
+      {uploading && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span className="spinner" style={{ width: 20, height: 20, borderTopColor: 'var(--gold)' }} />
+        </div>
+      )}
+
+      {/* Done checkmark */}
+      {!uploading && !error && (
+        <div style={{ position: 'absolute', bottom: 6, insetInlineStart: 6, background: 'rgba(0,0,0,.5)', borderRadius: 99, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.65rem', color: '#fff' }}>✓</div>
+      )}
+
+      {/* Error */}
+      {error && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.5)' }}>
+          <span style={{ fontSize: '.65rem', color: '#f88', fontWeight: 700 }}>{lang === 'ar' ? 'خطأ' : 'Error'}</span>
+        </div>
+      )}
+
+      {/* Remove button */}
+      <button onClick={onRemove} style={{
+        position: 'absolute', top: 5, insetInlineEnd: 5,
+        width: 22, height: 22, borderRadius: '50%',
+        background: 'rgba(0,0,0,.5)', color: '#fff',
+        border: 'none', cursor: 'pointer', fontSize: '.7rem',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>✕</button>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════ */
+function ImageCard({ img, lang, onRemove, onAddPending, onRemovePending, onRetryOcr, onTextEdit }: {
   img: ImageItem; lang: string
   onRemove: () => void
   onAddPending: (t: string) => void
   onRemovePending: (i: number) => void
-  onSaveAll: () => void
   onRetryOcr: () => void
   onTextEdit: (text: string) => void
 }) {
   const [sel, setSel] = useState('')
   const textareaRef   = useRef<HTMLTextAreaElement>(null)
 
-  // Capture selected text from textarea for quote adding
   const handleMouseUp = useCallback(() => {
     const el = textareaRef.current
     if (!el) return
@@ -399,114 +481,124 @@ function ImageCard({ img, lang, onRemove, onAddPending, onRemovePending, onSaveA
     setSel(s)
   }, [])
 
-  const handleAddSel = () => {
-    if (!sel) return
-    onAddPending(sel)
+  // Auto-save on selection: add immediately when user lifts mouse/key
+  const handleAddSel = useCallback(() => {
+    const el = textareaRef.current
+    if (!el) return
+    const s = el.value.slice(el.selectionStart, el.selectionEnd).trim()
+    if (!s) return
+    onAddPending(s)
     setSel('')
-  }
+    // Clear textarea selection
+    el.selectionStart = el.selectionEnd
+  }, [onAddPending])
 
   const isScanning = img.ocrStatus === 'scanning'
   const hasText    = img.ocrText.length > 0
 
   return (
     <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr' }}>
+      {/* Layout: large preview on top, content below */}
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
 
-        {/* Preview */}
-        <div style={{ position: 'relative', minHeight: 200, background: 'var(--surface-2)' }}>
+        {/* Preview — full width, taller */}
+        <div style={{ position: 'relative', height: 280, background: 'var(--surface-2)', flexShrink: 0 }}>
           {img.preview ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={img.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            <img src={img.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: 'var(--surface-2)' }} />
           ) : (
-            <div style={{ width: '100%', height: '100%', minHeight: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', fontSize: '1.6rem' }}>🖼️</div>
+            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', fontSize: '2rem' }}>🖼️</div>
           )}
           {isScanning && (
             <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.55)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              <span className="spinner" style={{ borderTopColor: 'var(--gold)', width: 24, height: 24 }} />
-              <span style={{ fontSize: '.68rem', color: 'var(--gold)', fontWeight: 600 }}>{lang === 'ar' ? 'قراءة...' : 'Scanning...'}</span>
+              <span className="spinner" style={{ borderTopColor: 'var(--gold)', width: 28, height: 28 }} />
+              <span style={{ fontSize: '.75rem', color: 'var(--gold)', fontWeight: 600 }}>{lang === 'ar' ? 'جارٍ القراءة...' : 'Scanning...'}</span>
             </div>
           )}
           {img.savedCount > 0 && (
-            <div style={{ position: 'absolute', bottom: 8, insetInlineStart: 8, background: 'var(--green)', color: '#fff', borderRadius: 'var(--r-full)', fontSize: '.65rem', fontWeight: 700, padding: '3px 8px' }}>
-              ✓ {img.savedCount}
+            <div style={{ position: 'absolute', bottom: 10, insetInlineStart: 10, background: 'var(--green)', color: '#fff', borderRadius: 'var(--r-full)', fontSize: '.7rem', fontWeight: 700, padding: '4px 10px' }}>
+              ✓ {img.savedCount} {lang === 'ar' ? 'محفوظ' : 'saved'}
             </div>
           )}
+          {/* Remove button */}
+          <button onClick={onRemove} style={{
+            position: 'absolute', top: 10, insetInlineEnd: 10,
+            width: 28, height: 28, borderRadius: '50%',
+            background: 'rgba(0,0,0,.45)', color: '#fff',
+            border: 'none', cursor: 'pointer', fontSize: '.8rem',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>✕</button>
         </div>
 
         {/* Content */}
-        <div style={{ padding: '14px 18px 16px', display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
+        <div style={{ padding: '14px 18px 18px', display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
 
-          {/* Status + remove */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '.72rem', fontWeight: 500 }}>
-              {isScanning && <span style={{ color: 'var(--gold)' }}>⟳ {lang === 'ar' ? 'جارٍ الاستخراج...' : 'Extracting...'}</span>}
-              {img.ocrStatus === 'done' && hasText && <span style={{ color: 'var(--green)' }}>✓ {lang === 'ar' ? 'تم استخراج النص' : 'Text ready'}</span>}
-              {img.ocrStatus === 'done' && !hasText && <span style={{ color: 'var(--text-3)' }}>○ {lang === 'ar' ? 'لا نص في الصورة' : 'No text found'}</span>}
-              {img.ocrStatus === 'error' && (
-                <span style={{ color: 'var(--text-3)' }}>✗ {lang === 'ar' ? 'فشل' : 'Failed'} &nbsp;
-                  {!img.isExisting && (
-                    <button onClick={onRetryOcr} style={{ color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '.68rem', textDecoration: 'underline' }}>
-                      {lang === 'ar' ? 'إعادة' : 'Retry'}
-                    </button>
-                  )}
-                </span>
-              )}
-            </span>
-            <button onClick={onRemove} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '.75rem', color: 'var(--text-3)', fontFamily: 'inherit' }}>✕</button>
-          </div>
-
-          {/* OCR text — always editable textarea, select text to add as quote */}
-          {(hasText || img.ocrStatus === 'error') && (
-            <div style={{ position: 'relative' }}>
-              <>
-                <textarea
-                  ref={textareaRef}
-                  value={img.ocrText}
-                  onChange={e => onTextEdit(e.target.value)}
-                  onMouseUp={handleMouseUp}
-                  onKeyUp={handleMouseUp}
-                  style={{
-                    padding: '12px 14px',
-                    background: 'var(--surface-2)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--r-md)',
-                    fontSize: '.88rem', lineHeight: 1.9,
-                    color: 'var(--text)', direction: 'rtl',
-                    resize: 'vertical', minHeight: 120,
-                    width: '100%', boxSizing: 'border-box',
-                    fontFamily: 'inherit', outline: 'none',
-                  }}
-                  onFocus={e => { e.currentTarget.style.borderColor = 'var(--gold)' }}
-                  onBlur={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
-                />
-                {sel && (
-                  <button onMouseDown={e => e.preventDefault()} onClick={handleAddSel} style={{
-                    position: 'absolute', bottom: -14, left: '50%', transform: 'translateX(-50%)',
-                    background: 'var(--gold)', color: '#fff', border: 'none',
-                    borderRadius: 'var(--r-full)', padding: '4px 16px',
-                    fontSize: '.72rem', fontWeight: 700, cursor: 'pointer',
-                    fontFamily: 'inherit', whiteSpace: 'nowrap',
-                    boxShadow: '0 2px 10px rgba(0,0,0,.2)',
-                  }}>
-                    + {lang === 'ar' ? 'أضف كاقتباس' : 'Add as quote'}
+          {/* Status */}
+          <div style={{ fontSize: '.72rem', fontWeight: 500 }}>
+            {isScanning && <span style={{ color: 'var(--gold)' }}>⟳ {lang === 'ar' ? 'جارٍ الاستخراج...' : 'Extracting...'}</span>}
+            {img.ocrStatus === 'done' && hasText && <span style={{ color: 'var(--green)' }}>✓ {lang === 'ar' ? 'تم استخراج النص — ظلّل لإضافة اقتباس' : 'Text ready — highlight to add quote'}</span>}
+            {img.ocrStatus === 'done' && !hasText && <span style={{ color: 'var(--text-3)' }}>○ {lang === 'ar' ? 'لا نص في الصورة' : 'No text found'}</span>}
+            {img.ocrStatus === 'error' && (
+              <span style={{ color: 'var(--text-3)' }}>✗ {lang === 'ar' ? 'فشل الاستخراج' : 'Extraction failed'} &nbsp;
+                {!img.isExisting && (
+                  <button onClick={onRetryOcr} style={{ color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '.68rem', textDecoration: 'underline' }}>
+                    {lang === 'ar' ? 'إعادة' : 'Retry'}
                   </button>
                 )}
-              </>
+              </span>
+            )}
+          </div>
+
+          {/* OCR textarea + always-visible add button */}
+          {(hasText || img.ocrStatus === 'error') && (
+            <div style={{ position: 'relative', paddingBottom: 36 }}>
+              <textarea
+                ref={textareaRef}
+                value={img.ocrText}
+                onChange={e => onTextEdit(e.target.value)}
+                onMouseUp={handleMouseUp}
+                onKeyUp={handleMouseUp}
+                style={{
+                  padding: '12px 14px',
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--r-md)',
+                  fontSize: '.88rem', lineHeight: 1.9,
+                  color: 'var(--text)', direction: 'rtl',
+                  resize: 'vertical', minHeight: 140,
+                  width: '100%', boxSizing: 'border-box',
+                  fontFamily: 'inherit', outline: 'none',
+                }}
+                onFocus={e => e.currentTarget.style.borderColor = 'var(--gold)'}
+                onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'}
+              />
+              {/* Always-visible add button — active only when text selected */}
+              <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={handleAddSel}
+                disabled={!sel}
+                style={{
+                  position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)',
+                  background: sel ? 'var(--gold)' : 'var(--border)',
+                  color: sel ? '#fff' : 'var(--text-3)',
+                  border: 'none', borderRadius: 'var(--r-full)',
+                  padding: '5px 20px', fontSize: '.75rem', fontWeight: 700,
+                  cursor: sel ? 'pointer' : 'default',
+                  fontFamily: 'inherit', whiteSpace: 'nowrap',
+                  boxShadow: sel ? '0 2px 10px rgba(0,0,0,.15)' : 'none',
+                  transition: 'all .15s ease',
+                }}
+              >
+                + {lang === 'ar' ? 'إضافة' : 'Add'}
+              </button>
             </div>
           )}
 
-          {/* Hint */}
-          {hasText && img.pending.length === 0 && img.savedCount === 0 && !isScanning && (
-            <p style={{ fontSize: '.72rem', color: 'var(--text-3)', margin: 0 }}>
-              {lang === 'ar' ? '💡 ظلّل أي جزء من النص لإضافته كاقتباس' : '💡 Highlight text to add as a quote'}
-            </p>
-          )}
-
-          {/* Pending quotes */}
+          {/* Saved quotes list */}
           {img.pending.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ fontSize: '.7rem', color: 'var(--text-3)', fontWeight: 600 }}>
-                {img.pending.length} {lang === 'ar' ? 'اقتباس محدد' : 'selected'}
+                {img.pending.length} {lang === 'ar' ? 'اقتباس مضاف' : 'added'}
               </div>
               {img.pending.map((q, i) => (
                 <div key={i} style={{
@@ -516,22 +608,17 @@ function ImageCard({ img, lang, onRemove, onAddPending, onRemovePending, onSaveA
                   borderRadius: 'var(--r-md)', fontSize: '.84rem', lineHeight: 1.7,
                 }}>
                   <span style={{ color: 'var(--gold)', fontWeight: 700, flexShrink: 0, marginTop: 1 }}>❝</span>
-                  <span style={{ flex: 1, color: 'var(--text)' }}>{q}</span>
+                  <span style={{ flex: 1, color: 'var(--text)', direction: 'rtl' }}>{q}</span>
                   <button onClick={() => onRemovePending(i)}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: '.75rem', padding: 0, flexShrink: 0 }}>✕</button>
                 </div>
               ))}
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button onClick={onSaveAll} className="btn btn-gold" style={{ fontSize: '.82rem' }}>
-                  {lang === 'ar' ? `حفظ ${img.pending.length} اقتباس` : `Save ${img.pending.length}`}
-                </button>
-              </div>
             </div>
           )}
 
           {img.savedCount > 0 && img.pending.length === 0 && (
             <div style={{ fontSize: '.75rem', color: 'var(--green)', fontWeight: 500 }}>
-              ✓ {lang === 'ar' ? `${img.savedCount} اقتباس محفوظ من هذه الصورة` : `${img.savedCount} quote${img.savedCount > 1 ? 's' : ''} saved`}
+              ✓ {lang === 'ar' ? `${img.savedCount} اقتباس محفوظ` : `${img.savedCount} quote${img.savedCount > 1 ? 's' : ''} saved`}
             </div>
           )}
         </div>
