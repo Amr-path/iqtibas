@@ -7,7 +7,6 @@ import { useSettings } from '@/stores/settings'
 import { useT } from '@/lib/translations'
 import toast from 'react-hot-toast'
 import GlobalSearch from '@/components/GlobalSearch'
-import AddKnowledgeModal from '@/components/AddKnowledgeModal'
 import { supabase } from '@/lib/supabase/client'
 
 /* ── SVG Icons ── */
@@ -110,8 +109,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { lang } = useSettings()
   const t = useT(lang)
   const router = useRouter()
-  const [modalOpen, setModalOpen] = useState(false)
-
   const name    = user?.user_metadata?.first_name || user?.email?.split('@')[0] || 'م'
   const initial = name.charAt(0).toUpperCase()
   const email   = user?.email || ''
@@ -138,7 +135,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="app-body">
         {/* SIDEBAR */}
         <aside className="sidebar-new">
-          <button className="btn-add-knowledge" onClick={() => setModalOpen(true)}>
+          <button className="btn-add-knowledge" onClick={() => router.push('/books/add')}>
             <span className="btn-add-icon"><IconPlus /></span>
             <span>{t('addKnowledge')}</span>
           </button>
@@ -180,7 +177,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* MOBILE NAV */}
       <MobileNav t={t} />
 
-      <AddKnowledgeModal open={modalOpen} onClose={() => setModalOpen(false)} />
     </div>
   )
 }
