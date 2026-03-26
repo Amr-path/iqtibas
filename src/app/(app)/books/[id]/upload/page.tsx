@@ -18,6 +18,7 @@ interface ImageItem {
   preview:       string      // local blob URL or public storage URL
   ocrStatus:     OcrStatus
   uploadStatus:  UploadStatus
+  uploadError?:  string      // human-readable error message when uploadStatus='error'
   dbImageId?:    string
   ocrText:       string
   pending:       string[]
@@ -170,8 +171,14 @@ export default function UploadPage() {
       setImages(prev => prev.map(i =>
         i.id === itemId ? { ...i, uploadStatus: 'done' } : i
       ))
-    } catch {
-      setImages(prev => prev.map(i => i.id === itemId ? { ...i, uploadStatus: 'error' } : i))
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message
+        : (typeof err === 'object' && err !== null && 'message' in err)
+          ? String((err as { message: unknown }).message)
+          : lang === 'ar' ? 'فشل الرفع' : 'Upload failed'
+      setImages(prev => prev.map(i =>
+        i.id === itemId ? { ...i, uploadStatus: 'error', uploadError: msg } : i
+      ))
     }
   }
 
@@ -355,6 +362,10 @@ export default function UploadPage() {
                   URL.revokeObjectURL(prev.find(i => i.id === img.id)?.preview || '')
                   return prev.filter(i => i.id !== img.id)
                 })}
+                onRetry={() => {
+                  setImages(prev => prev.map(i => i.id === img.id ? { ...i, uploadStatus: 'idle', uploadError: undefined } : i))
+                  tryUpload(img.id, img.file, img.dbImageId)
+                }}
               />
             ))}
           </div>
@@ -422,44 +433,61 @@ export default function UploadPage() {
 
 /* ═══════════════════════════════════════ */
 /* Simple thumbnail for newly uploaded images (no OCR/quote UI) */
-function UploadThumb({ img, lang, onRemove }: {
-  img: ImageItem; lang: string; onRemove: () => void
+function UploadThumb({ img, lang, onRemove, onRetry }: {
+  img: ImageItem; lang: string; onRemove: () => void; onRetry: () => void
 }) {
   const uploading = img.uploadStatus === 'uploading' || img.uploadStatus === 'idle'
   const error     = img.uploadStatus === 'error'
 
   return (
-    <div style={{ position: 'relative', borderRadius: 'var(--r-md)', overflow: 'hidden', background: 'var(--surface-2)', aspectRatio: '1', border: '1px solid var(--border-light)' }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={img.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: uploading ? 0.5 : 1, transition: 'opacity .3s' }} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ position: 'relative', borderRadius: 'var(--r-md)', overflow: 'hidden', background: 'var(--surface-2)', aspectRatio: '1', border: `1px solid ${error ? 'var(--red)' : 'var(--border-light)'}` }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={img.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: uploading || error ? 0.45 : 1, transition: 'opacity .3s' }} />
 
-      {/* Overlay while uploading */}
-      {uploading && (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span className="spinner" style={{ width: 20, height: 20, borderTopColor: 'var(--gold)' }} />
+        {/* Overlay while uploading */}
+        {uploading && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span className="spinner" style={{ width: 20, height: 20, borderTopColor: 'var(--gold)' }} />
+          </div>
+        )}
+
+        {/* Done checkmark */}
+        {!uploading && !error && (
+          <div style={{ position: 'absolute', bottom: 6, insetInlineStart: 6, background: 'rgba(0,0,0,.5)', borderRadius: 99, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.65rem', color: '#fff' }}>✓</div>
+        )}
+
+        {/* Error overlay */}
+        {error && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'rgba(0,0,0,.45)' }}>
+            <span style={{ fontSize: '.85rem' }}>⚠️</span>
+            <button onClick={onRetry} style={{
+              background: 'var(--gold)', color: '#fff', border: 'none',
+              borderRadius: 'var(--r-full)', padding: '3px 10px',
+              fontSize: '.62rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+            }}>
+              {lang === 'ar' ? 'إعادة' : 'Retry'}
+            </button>
+          </div>
+        )}
+
+        {/* Remove button */}
+        <button onClick={onRemove} style={{
+          position: 'absolute', top: 5, insetInlineEnd: 5,
+          width: 22, height: 22, borderRadius: '50%',
+          background: 'rgba(0,0,0,.5)', color: '#fff',
+          border: 'none', cursor: 'pointer', fontSize: '.7rem',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>✕</button>
+      </div>
+
+      {/* Error reason below thumbnail */}
+      {error && img.uploadError && (
+        <div style={{ fontSize: '.6rem', color: 'var(--red)', lineHeight: 1.3, paddingInline: 2 }}
+          title={img.uploadError}>
+          {img.uploadError.length > 40 ? img.uploadError.slice(0, 40) + '…' : img.uploadError}
         </div>
       )}
-
-      {/* Done checkmark */}
-      {!uploading && !error && (
-        <div style={{ position: 'absolute', bottom: 6, insetInlineStart: 6, background: 'rgba(0,0,0,.5)', borderRadius: 99, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.65rem', color: '#fff' }}>✓</div>
-      )}
-
-      {/* Error */}
-      {error && (
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.5)' }}>
-          <span style={{ fontSize: '.65rem', color: '#f88', fontWeight: 700 }}>{lang === 'ar' ? 'خطأ' : 'Error'}</span>
-        </div>
-      )}
-
-      {/* Remove button */}
-      <button onClick={onRemove} style={{
-        position: 'absolute', top: 5, insetInlineEnd: 5,
-        width: 22, height: 22, borderRadius: '50%',
-        background: 'rgba(0,0,0,.5)', color: '#fff',
-        border: 'none', cursor: 'pointer', fontSize: '.7rem',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>✕</button>
     </div>
   )
 }
