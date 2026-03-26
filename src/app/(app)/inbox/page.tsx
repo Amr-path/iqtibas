@@ -124,7 +124,8 @@ export default function InboxPage() {
             >
               <div className="lib-book-card">
                 {/* Cover */}
-                <div className="lib-cover-wrap">
+                <div className="lib-book-cover">
+                  <div className="lib-book-spine" />
                   {book.bookCoverUrl ? (
                     <Image
                       src={book.bookCoverUrl}
@@ -136,13 +137,7 @@ export default function InboxPage() {
                     <DynamicCover title={book.bookTitle} />
                   )}
                   {/* Pending badge */}
-                  <div style={{
-                    position: 'absolute', top: 8, insetInlineEnd: 8,
-                    background: 'var(--gold)', color: '#fff',
-                    borderRadius: 'var(--r-full)', fontSize: '.62rem',
-                    fontWeight: 700, padding: '3px 7px',
-                    boxShadow: '0 2px 6px rgba(0,0,0,.2)',
-                  }}>
+                  <div className="lib-book-badge">
                     {book.imageCount} {lang === 'ar' ? 'صورة' : 'img'}
                   </div>
                 </div>

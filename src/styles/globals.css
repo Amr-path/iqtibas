@@ -1725,7 +1725,7 @@ html[dir="ltr"] .sidebar-accent-bar {
 /* Add Knowledge Button */
 .btn-add-knowledge {
   width: calc(100% - 24px);
-  margin: 0 12px 4px;
+  margin: 14px 12px 4px;
   background: linear-gradient(135deg, #c8922a 0%, var(--gold) 100%);
   color: #fff;
   border-radius: 12px;
@@ -1851,8 +1851,8 @@ html[dir="ltr"] .nav-item-new.active::before {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   flex-shrink: 0;
   transition: all .18s ease;
   color: var(--text-3);

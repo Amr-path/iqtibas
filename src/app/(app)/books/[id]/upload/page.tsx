@@ -501,8 +501,8 @@ function ImageCard({ img, lang, onRemove, onAddPending, onRemovePending, onRetry
       {/* Layout: large preview on top, content below */}
       <div style={{ display: 'flex', flexDirection: 'column' }}>
 
-        {/* Preview — full width, taller */}
-        <div style={{ position: 'relative', height: 280, background: 'var(--surface-2)', flexShrink: 0 }}>
+        {/* Preview — moderate height matching library covers */}
+        <div style={{ position: 'relative', height: 170, background: 'var(--surface-2)', flexShrink: 0 }}>
           {img.preview ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={img.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: 'var(--surface-2)' }} />
