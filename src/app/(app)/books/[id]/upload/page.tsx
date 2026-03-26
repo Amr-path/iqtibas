@@ -575,7 +575,7 @@ function ImageCard({ img, lang, onRemove, onAddPending, onRemovePending, onRetry
         </div>
 
         {/* Content */}
-        <div style={{ padding: '14px 18px 18px', display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
+        <div style={{ flex: 1, padding: '14px 18px 18px', display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
 
           {/* Status */}
           <div style={{ fontSize: '.72rem', fontWeight: 500 }}>
