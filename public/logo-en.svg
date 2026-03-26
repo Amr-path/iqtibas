@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 34" width="130" height="34">
+  <text
+    x="5"
+    y="25"
+    text-anchor="start"
+    font-family="'IBM Plex Sans Arabic','Segoe UI','Helvetica Neue',Arial,sans-serif"
+    font-size="22"
+    letter-spacing="-0.4"
+    fill="#2d2318"
+  ><tspan font-weight="300">Iqt</tspan><tspan font-weight="500" fill="#D4AF37">ibas</tspan></text>
+</svg>

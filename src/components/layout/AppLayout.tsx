@@ -124,7 +124,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* TOPBAR */}
       <header className="app-topbar">
         <div className="app-topbar-logo">
-          {lang === 'ar' ? <>اقت<span>باس</span></> : <>Iqt<span>ibas</span></>}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lang === 'ar' ? '/logo-ar.svg' : '/logo-en.svg'}
+            alt="إقتباس"
+            style={{ height: '28px', width: 'auto', display: 'block' }}
+          />
         </div>
         <div className="app-topbar-search">
           <GlobalSearch />

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 34" width="130" height="34">
+  <text
+    x="125"
+    y="25"
+    text-anchor="end"
+    direction="rtl"
+    font-family="'IBM Plex Sans Arabic','Segoe UI','SF Arabic','Noto Sans Arabic','Tahoma',Arial,sans-serif"
+    font-size="22"
+    letter-spacing="-0.4"
+    fill="#2d2318"
+  ><tspan font-weight="300">اقت</tspan><tspan font-weight="500" fill="#D4AF37">باس</tspan></text>
+</svg>
