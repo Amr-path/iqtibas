@@ -27,15 +27,13 @@ export default function LibraryPage() {
   useEffect(() => {
     if (!user) return
     async function load() {
-      // Fetch books
-      const { data } = await supabase
-        .from('user_books').select('*, books(*)')
-        .eq('user_id', user!.id).order('added_at', { ascending: false })
+      // Both queries are independent — fire in parallel
+      const [{ data }, { data: quotesData }] = await Promise.all([
+        supabase.from('user_books').select('*, books(*)')
+          .eq('user_id', user!.id).order('added_at', { ascending: false }),
+        supabase.from('quotes').select('book_id').eq('user_id', user!.id),
+      ])
       if (!data) { setLoading(false); return }
-
-      // Count actual quotes per book (accurate, ignores stale quotes_count cache)
-      const { data: quotesData } = await supabase
-        .from('quotes').select('book_id').eq('user_id', user!.id)
 
       const countMap = new Map<string, number>()
       for (const q of quotesData || []) {

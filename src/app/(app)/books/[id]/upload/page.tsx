@@ -87,16 +87,13 @@ export default function UploadPage() {
 
       const imgIds = imgs.map(i => i.id)
 
-      // Extracted text for those images
-      const { data: extracted } = await supabase
-        .from('extracted_texts').select('image_id, full_text').in('image_id', imgIds)
+      // extracted_texts and existing quotes can be fetched in parallel
+      const [{ data: extracted }, { data: quoted }] = await Promise.all([
+        supabase.from('extracted_texts').select('image_id, full_text').in('image_id', imgIds),
+        supabase.from('quotes').select('image_id').in('image_id', imgIds),
+      ])
       if (!extracted || extracted.length === 0) return
 
-      const extractedIds = extracted.map(e => e.image_id)
-
-      // Which ones already have quotes?
-      const { data: quoted } = await supabase
-        .from('quotes').select('image_id').in('image_id', extractedIds)
       const quotedSet = new Set((quoted || []).map(q => q.image_id).filter(Boolean))
 
       const pending: ImageItem[] = []
