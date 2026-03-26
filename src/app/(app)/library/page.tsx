@@ -93,17 +93,18 @@ export default function LibraryPage() {
         <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center' }}>
           {/* Search */}
           <div style={{ position: 'relative', flex: '1 1 180px', minWidth: 180 }}>
-            <svg style={{ position: 'absolute', insetInlineStart: 12, top: '50%', transform: 'translateY(-50%)', opacity: .4, pointerEvents: 'none' }}
+            <svg style={{ position: 'absolute', insetInlineEnd: 12, top: '50%', transform: 'translateY(-50%)', opacity: .4, pointerEvents: 'none' }}
               width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
             </svg>
             <input value={search} onChange={e => setSearch(e.target.value)}
               placeholder={lang === 'ar' ? 'ابحث في مكتبتك...' : 'Search your library...'}
+              dir="rtl"
               style={{
-                width: '100%', padding: '9px 12px 9px 34px', borderRadius: 'var(--r-md)',
+                width: '100%', padding: '9px 34px 9px 12px', borderRadius: 'var(--r-md)',
                 border: '1px solid var(--border)', background: 'var(--surface)',
                 fontSize: '.88rem', fontFamily: 'inherit', color: 'var(--text)',
-                outline: 'none', transition: 'border-color var(--t)',
+                outline: 'none', transition: 'border-color var(--t)', direction: 'rtl',
               }}
             />
           </div>

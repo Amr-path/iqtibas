@@ -85,20 +85,20 @@ export default function GlobalSearch() {
   return (
     <div ref={containerRef} className="global-search" style={{ position: 'relative' }}>
       <div className="global-search-bar">
-        <svg className="global-search-icon" width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
-          <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.5"/>
-          <line x1="9.5" y1="9.5" x2="13" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-        </svg>
         <input ref={inputRef} type="text" className="global-search-input"
           placeholder={t('globalSearchPH')} value={query}
           onChange={handleChange} onFocus={() => { if (query.trim().length >= 2) setOpen(true) }}
           onKeyDown={e => { if (e.key === 'Enter') goSearch() }}
-          autoComplete="off" dir="auto"
+          autoComplete="off" dir="rtl"
         />
         {query && (
           <button className="global-search-clear"
             onPointerDown={e => { e.preventDefault(); setQuery(''); setOpen(false); inputRef.current?.focus() }}>×</button>
         )}
+        <svg className="global-search-icon" width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
+          <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.5"/>
+          <line x1="9.5" y1="9.5" x2="13" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
       </div>
       {open && (
         <div className="global-search-dropdown">

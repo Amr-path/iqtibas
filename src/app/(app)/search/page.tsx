@@ -82,20 +82,16 @@ export default function SearchResultsPage() {
             onFocus={e => e.currentTarget.style.borderColor = 'var(--gold)'}
             onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'}
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ color: 'var(--text-3)', flexShrink: 0 }}>
-              <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.5"/>
-              <line x1="9.5" y1="9.5" x2="13" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
             <input
               ref={inputRef}
               value={query}
               onChange={e => setQuery(e.target.value)}
               placeholder={lang === 'ar' ? 'ابحث في اقتباساتك...' : 'Search your quotes...'}
-              dir="auto"
+              dir="rtl"
               autoFocus
               style={{
                 flex: 1, background: 'none', border: 'none', outline: 'none',
-                fontSize: '.9rem', color: 'var(--text)', fontFamily: 'inherit',
+                fontSize: '.9rem', color: 'var(--text)', fontFamily: 'inherit', direction: 'rtl',
               }}
             />
             {query && (
@@ -104,6 +100,10 @@ export default function SearchResultsPage() {
                 ×
               </button>
             )}
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ color: 'var(--text-3)', flexShrink: 0 }}>
+              <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.5"/>
+              <line x1="9.5" y1="9.5" x2="13" y2="13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
           </div>
           <button type="submit" className="btn btn-gold" style={{ height: 42, paddingInline: 20 }}>
             {lang === 'ar' ? 'بحث' : 'Search'}
