@@ -1004,7 +1004,7 @@ html[dir="ltr"] .page-title::after { right: auto; left: 0; }
 
 /* Info below the cover */
 .lib-book-info {
-  padding: 0 2px;
+  display: none;
 }
 .lib-book-title {
   font-size: .78rem;

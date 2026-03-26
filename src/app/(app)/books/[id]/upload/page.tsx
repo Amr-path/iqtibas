@@ -395,7 +395,12 @@ export default function UploadPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {existingImages.map(img => (
               <ImageCard key={img.id} img={img} lang={lang}
-                onRemove={() => setImages(prev => prev.filter(i => i.id !== img.id))}
+                onRemove={async () => {
+                  // Mark dismissed in DB so it never reappears
+                  if (img.dbImageId)
+                    await supabase.from('images').update({ status: 'dismissed' }).eq('id', img.dbImageId)
+                  setImages(prev => prev.filter(i => i.id !== img.id))
+                }}
                 onAddPending={text => saveQuoteNow(img.id, text)}
                 onRemovePending={idx => removePending(img.id, idx)}
                 onRetryOcr={() => runOcr(img.id, img.file, img.dbImageId)}
