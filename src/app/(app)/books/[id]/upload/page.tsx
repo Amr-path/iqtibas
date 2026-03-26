@@ -88,36 +88,35 @@ export default function UploadPage() {
 
       const imgIds = imgs.map(i => i.id)
 
-      // extracted_texts and existing quotes can be fetched in parallel
+      // Fetch extracted_texts and quoted images in parallel (extracted is optional)
       const [{ data: extracted }, { data: quoted }] = await Promise.all([
         supabase.from('extracted_texts').select('image_id, full_text').in('image_id', imgIds),
         supabase.from('quotes').select('image_id').in('image_id', imgIds),
       ])
-      if (!extracted || extracted.length === 0) return
 
-      const quotedSet = new Set((quoted || []).map(q => q.image_id).filter(Boolean))
+      const quotedSet   = new Set((quoted   || []).map(q => q.image_id).filter(Boolean))
+      const extractedMap = new Map((extracted || []).map(e => [e.image_id, e.full_text]))
 
       const pending: ImageItem[] = []
-      for (const ex of extracted) {
-        if (quotedSet.has(ex.image_id)) continue
-        const img = imgs.find(i => i.id === ex.image_id)
-        if (!img) continue
+      for (const img of imgs) {
+        // Skip images that have already been fully quoted
+        if (quotedSet.has(img.id)) continue
         // If public_url is missing but storage_path exists, regenerate the URL
         let previewUrl = img.public_url ?? ''
         if (!previewUrl && img.storage_path) {
           const { data: urlData } = supabase.storage.from('book-images').getPublicUrl(img.storage_path)
           previewUrl = urlData.publicUrl
-          // Persist the regenerated URL back to DB silently
           supabase.from('images').update({ public_url: previewUrl, status: 'uploaded' })
             .eq('id', img.id).then(() => {})
         }
+        const ocrText = extractedMap.get(img.id) ?? ''
         pending.push({
           id:           `existing_${img.id}`,
           preview:      previewUrl,
-          ocrStatus:    'done',
+          ocrStatus:    ocrText ? 'done' : 'idle',
           uploadStatus: 'done',
           dbImageId:    img.id,
-          ocrText:      ex.full_text ?? '',
+          ocrText,
           pending:      [],
           savedCount:   0,
           isExisting:   true,

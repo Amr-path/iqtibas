@@ -69,7 +69,7 @@ export default function AddBookPage() {
       if (coverFile) {
         setCoverUploading(true)
         const safeName = coverFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-        const path = `covers/${user.id}/${Date.now()}_${safeName}`
+        const path = `${user.id}/covers/${Date.now()}_${safeName}`
         const { error: upErr } = await supabase.storage
           .from('book-images').upload(path, coverFile, { cacheControl: '3600', upsert: false })
         if (!upErr) {
