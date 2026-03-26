@@ -125,40 +125,68 @@ export default function UploadPage() {
           isExisting:   true,
         })
       }
-      if (pending.length > 0)
+      if (pending.length > 0) {
         setImages(prev => {
           const existingDbIds = new Set(prev.map(i => i.dbImageId).filter(Boolean))
           return [...prev, ...pending.filter(p => !existingDbIds.has(p.dbImageId))]
         })
+        // Auto-trigger OCR for any image that has no extracted text yet
+        for (const item of pending) {
+          if (item.ocrStatus === 'idle' && item.preview) {
+            // Small stagger to avoid hitting the API simultaneously
+            setTimeout(() => runOcrFromUrl(item.id, item.preview, item.dbImageId), 300)
+          }
+        }
+      }
     }
     loadExisting()
   }, [user, bookId])
 
-  /* ── OCR — saves text to DB after success ── */
+  /* ── OCR core — accepts base64, saves to DB, updates state ── */
+  async function runOcrBase64(itemId: string, base64: string, dbImageId?: string) {
+    const text = await serverOcr(base64)
+    const imgId = dbImageId ?? images.find(i => i.id === itemId)?.dbImageId
+    if (imgId) {
+      // Upsert so re-runs overwrite the old row rather than error on duplicate
+      const { error: etErr } = await supabase.from('extracted_texts').upsert({
+        image_id:     imgId,
+        full_text:    text,
+        ocr_provider: 'google-vision',
+        extracted_at: new Date().toISOString(),
+      }, { onConflict: 'image_id' })
+      if (etErr) console.error('extracted_text upsert error:', JSON.stringify(etErr))
+    }
+    setImages(prev => prev.map(i =>
+      i.id === itemId ? { ...i, ocrStatus: 'done', ocrText: text } : i
+    ))
+    return text
+  }
+
+  /* ── OCR from File (newly uploaded images) ── */
   async function runOcr(itemId: string, file: File | undefined, dbImageId?: string) {
     if (!file) return
     setImages(prev => prev.map(i => i.id === itemId ? { ...i, ocrStatus: 'scanning' } : i))
     try {
       const base64 = await imageToBase64(file)
-      const text   = await serverOcr(base64)
-
-      // Save extracted text to DB so unprocessed images appear in inbox
-      const imgId = dbImageId ?? images.find(i => i.id === itemId)?.dbImageId
-      if (imgId && text) {
-        const { error: etErr } = await supabase.from('extracted_texts').insert({
-          image_id:     imgId,
-          full_text:    text,
-          ocr_provider: 'google-vision',
-          extracted_at: new Date().toISOString(),
-        })
-        if (etErr) console.error('extracted_text insert error:', JSON.stringify(etErr))
-      }
-
-      setImages(prev => prev.map(i =>
-        i.id === itemId ? { ...i, ocrStatus: 'done', ocrText: text } : i
-      ))
+      await runOcrBase64(itemId, base64, dbImageId)
     } catch (err) {
       console.error('OCR:', err)
+      setImages(prev => prev.map(i => i.id === itemId ? { ...i, ocrStatus: 'error' } : i))
+    }
+  }
+
+  /* ── OCR from URL (existing DB images with no extracted text) ── */
+  async function runOcrFromUrl(itemId: string, url: string, dbImageId?: string) {
+    if (!url) return
+    setImages(prev => prev.map(i => i.id === itemId ? { ...i, ocrStatus: 'scanning' } : i))
+    try {
+      const resp = await fetch(url)
+      const blob = await resp.blob()
+      const file = new File([blob], 'image.jpg', { type: blob.type || 'image/jpeg' })
+      const base64 = await imageToBase64(file)
+      await runOcrBase64(itemId, base64, dbImageId)
+    } catch (err) {
+      console.error('OCR from URL:', err)
       setImages(prev => prev.map(i => i.id === itemId ? { ...i, ocrStatus: 'error' } : i))
     }
   }
@@ -423,7 +451,9 @@ export default function UploadPage() {
                 }}
                 onAddPending={text => saveQuoteNow(img.id, text)}
                 onRemovePending={idx => removePending(img.id, idx)}
-                onRetryOcr={() => runOcr(img.id, img.file, img.dbImageId)}
+                onRetryOcr={() => img.file
+                  ? runOcr(img.id, img.file, img.dbImageId)
+                  : runOcrFromUrl(img.id, img.preview, img.dbImageId)}
                 onTextEdit={newText => setImages(prev => prev.map(i => i.id === img.id ? { ...i, ocrText: newText } : i))}
               />
             ))}
@@ -577,16 +607,15 @@ function ImageCard({ img, lang, onRemove, onAddPending, onRemovePending, onRetry
 
           {/* Status */}
           <div style={{ fontSize: '.72rem', fontWeight: 500 }}>
+            {img.ocrStatus === 'idle' && <span style={{ color: 'var(--gold)' }}>⟳ {lang === 'ar' ? 'جارٍ تحضير النص...' : 'Preparing text...'}</span>}
             {isScanning && <span style={{ color: 'var(--gold)' }}>⟳ {lang === 'ar' ? 'جارٍ الاستخراج...' : 'Extracting...'}</span>}
             {img.ocrStatus === 'done' && hasText && <span style={{ color: 'var(--green)' }}>✓ {lang === 'ar' ? 'تم استخراج النص — ظلّل لإضافة اقتباس' : 'Text ready — highlight to add quote'}</span>}
             {img.ocrStatus === 'done' && !hasText && <span style={{ color: 'var(--text-3)' }}>○ {lang === 'ar' ? 'لا نص في الصورة' : 'No text found'}</span>}
             {img.ocrStatus === 'error' && (
               <span style={{ color: 'var(--text-3)' }}>✗ {lang === 'ar' ? 'فشل الاستخراج' : 'Extraction failed'} &nbsp;
-                {!img.isExisting && (
-                  <button onClick={onRetryOcr} style={{ color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '.68rem', textDecoration: 'underline' }}>
-                    {lang === 'ar' ? 'إعادة' : 'Retry'}
-                  </button>
-                )}
+                <button onClick={onRetryOcr} style={{ color: 'var(--gold)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '.68rem', textDecoration: 'underline' }}>
+                  {lang === 'ar' ? 'إعادة المسح' : 'Retry scan'}
+                </button>
               </span>
             )}
           </div>
