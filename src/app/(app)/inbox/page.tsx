@@ -40,20 +40,14 @@ export default function InboxPage() {
 
       const imageIds = userImages.map(i => i.id)
 
-      // 2 + 3 fire in parallel — both only need imageIds from step 1
-      const [{ data: extracted }, { data: quoted }] = await Promise.all([
-        supabase.from('extracted_texts').select('image_id').in('image_id', imageIds),
-        supabase.from('quotes').select('image_id').in('image_id', imageIds),
-      ])
-      if (!extracted || extracted.length === 0) { setBooks([]); return }
+      // 2. Only need quoted images — OCR text is optional (may have failed/pending)
+      const { data: quoted } = await supabase
+        .from('quotes').select('image_id').in('image_id', imageIds)
 
-      const extractedIds = new Set(extracted.map(e => e.image_id))
-      const quotedSet    = new Set((quoted || []).map(q => q.image_id).filter(Boolean))
+      const quotedSet = new Set((quoted || []).map(q => q.image_id).filter(Boolean))
 
-      // 4. Unprocessed images = has extracted text but no quotes yet
-      const unprocessed = userImages.filter(img =>
-        extractedIds.has(img.id) && !quotedSet.has(img.id)
-      )
+      // 3. Unprocessed = no quotes yet (regardless of OCR status)
+      const unprocessed = userImages.filter(img => !quotedSet.has(img.id))
 
       // 5. Group by book
       const map = new Map<string, InboxBook>()
