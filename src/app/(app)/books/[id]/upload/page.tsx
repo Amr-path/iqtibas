@@ -109,11 +109,14 @@ export default function UploadPage() {
           supabase.from('images').update({ public_url: previewUrl, status: 'uploaded' })
             .eq('id', img.id).then(() => {})
         }
-        const ocrText = extractedMap.get(img.id) ?? ''
+        // Use 'done' if there's an extracted_texts row (even if text is empty/null)
+        // Use 'idle' only when no OCR has been run at all for this image
+        const hasExtracted = extractedMap.has(img.id)
+        const ocrText      = extractedMap.get(img.id) ?? ''
         pending.push({
           id:           `existing_${img.id}`,
           preview:      previewUrl,
-          ocrStatus:    ocrText ? 'done' : 'idle',
+          ocrStatus:    hasExtracted ? 'done' : 'idle',
           uploadStatus: 'done',
           dbImageId:    img.id,
           ocrText,
