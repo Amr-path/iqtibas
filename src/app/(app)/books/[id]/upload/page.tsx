@@ -81,7 +81,7 @@ export default function UploadPage() {
       // Images for this book that aren't dismissed
       const { data: imgs } = await supabase
         .from('images')
-        .select('id, public_url, file_name')
+        .select('id, public_url, storage_path, file_name')
         .eq('book_id', bookId).eq('user_id', user!.id)
         .neq('status', 'dismissed')
       if (!imgs || imgs.length === 0) return
@@ -102,9 +102,18 @@ export default function UploadPage() {
         if (quotedSet.has(ex.image_id)) continue
         const img = imgs.find(i => i.id === ex.image_id)
         if (!img) continue
+        // If public_url is missing but storage_path exists, regenerate the URL
+        let previewUrl = img.public_url ?? ''
+        if (!previewUrl && img.storage_path) {
+          const { data: urlData } = supabase.storage.from('book-images').getPublicUrl(img.storage_path)
+          previewUrl = urlData.publicUrl
+          // Persist the regenerated URL back to DB silently
+          supabase.from('images').update({ public_url: previewUrl, status: 'uploaded' })
+            .eq('id', img.id).then(() => {})
+        }
         pending.push({
           id:           `existing_${img.id}`,
-          preview:      img.public_url ?? '',
+          preview:      previewUrl,
           ocrStatus:    'done',
           uploadStatus: 'done',
           dbImageId:    img.id,
@@ -531,11 +540,11 @@ function ImageCard({ img, lang, onRemove, onAddPending, onRemovePending, onRetry
 
   return (
     <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-      {/* Layout: large preview on top, content below */}
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {/* Layout: image right, text left (RTL side-by-side) */}
+      <div style={{ display: 'flex', flexDirection: 'row', minHeight: 220 }}>
 
-        {/* Preview — moderate height matching library covers */}
-        <div style={{ position: 'relative', height: 170, background: 'var(--surface-2)', flexShrink: 0 }}>
+        {/* Preview — right side (first child = right in RTL) */}
+        <div style={{ position: 'relative', width: 190, flexShrink: 0, background: 'var(--surface-2)' }}>
           {img.preview ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={img.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: 'var(--surface-2)' }} />

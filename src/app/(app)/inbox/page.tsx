@@ -137,13 +137,13 @@ export default function InboxPage() {
                     {book.imageCount} {lang === 'ar' ? 'صورة' : 'img'}
                   </div>
                 </div>
-                {/* Info */}
-                <div className="lib-book-info">
-                  <div className="lib-book-title">{book.bookTitle}</div>
-                  {book.bookAuthor && (
-                    <div className="lib-book-author">{book.bookAuthor}</div>
-                  )}
-                  <div style={{ fontSize: '.68rem', color: 'var(--gold)', fontWeight: 600, marginTop: 4 }}>
+                {/* Info — shown explicitly (lib-book-info is hidden globally) */}
+                <div style={{ padding: '8px 4px 2px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '.75rem', fontWeight: 600, color: 'var(--text)', lineHeight: 1.3, marginBottom: 2,
+                    overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                    {book.bookTitle}
+                  </div>
+                  <div style={{ fontSize: '.63rem', color: 'var(--gold)', fontWeight: 600 }}>
                     {lang === 'ar' ? 'استخلاص ←' : 'Extract →'}
                   </div>
                 </div>
