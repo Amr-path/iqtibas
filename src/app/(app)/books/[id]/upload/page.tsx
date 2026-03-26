@@ -358,10 +358,13 @@ export default function UploadPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10 }}>
             {newImages.map(img => (
               <UploadThumb key={img.id} img={img} lang={lang}
-                onRemove={() => setImages(prev => {
-                  URL.revokeObjectURL(prev.find(i => i.id === img.id)?.preview || '')
-                  return prev.filter(i => i.id !== img.id)
-                })}
+                onRemove={async () => {
+                  const target = images.find(i => i.id === img.id)
+                  URL.revokeObjectURL(target?.preview || '')
+                  if (target?.dbImageId)
+                    await supabase.from('images').update({ status: 'dismissed' }).eq('id', target.dbImageId)
+                  setImages(prev => prev.filter(i => i.id !== img.id))
+                }}
                 onRetry={() => {
                   setImages(prev => prev.map(i => i.id === img.id ? { ...i, uploadStatus: 'idle', uploadError: undefined } : i))
                   tryUpload(img.id, img.file, img.dbImageId)

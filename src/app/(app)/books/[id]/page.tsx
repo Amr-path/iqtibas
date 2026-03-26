@@ -163,15 +163,6 @@ export default function BookDetailPage() {
         </div>
       </div>
 
-      {/* ── Description ── */}
-      {book.description && (
-        <div className="card" style={{ padding: '18px 22px', marginBottom: 28, fontSize: '.88rem', color: 'var(--text-2)', lineHeight: 1.8 }}>
-          <div style={{ fontSize: '.75rem', color: 'var(--text-3)', fontWeight: 500, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.06em' }}>
-            {lang === 'ar' ? 'نبذة' : 'About'}
-          </div>
-          {book.description}
-        </div>
-      )}
 
       {/* ── Quotes section ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
