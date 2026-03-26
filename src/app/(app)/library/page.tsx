@@ -190,9 +190,11 @@ function BookCard({ ub, lang, idx, onDelete }: {
             )}
           </div>
           {/* Info */}
-          <div className="lib-book-info">
-            <div className="lib-book-title">{ub.books.title}</div>
-            <div className="lib-book-author">{ub.books.author}</div>
+          <div style={{ padding: '8px 4px 2px', textAlign: 'center' }}>
+            <div style={{ fontSize: '.75rem', fontWeight: 600, color: 'var(--text)', lineHeight: 1.3,
+              overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+              {ub.books.title}
+            </div>
           </div>
         </div>
       </Link>

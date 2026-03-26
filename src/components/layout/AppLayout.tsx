@@ -235,7 +235,7 @@ function SidebarStats({ lang, user }: { lang: string; user: { id: string } | nul
           fontSize: '.6rem', fontWeight: 700, color: 'rgba(180,130,40,.7)',
           letterSpacing: '.12em', textTransform: 'uppercase',
         }}>
-          {lang === 'ar' ? 'مكتبتك' : 'Your Library'}
+          {lang === 'ar' ? 'إحصائيات' : 'Stats'}
         </span>
         <span style={{ fontSize: '.85rem', color: 'rgba(180,130,40,.4)', lineHeight: 1 }}>❝</span>
       </div>

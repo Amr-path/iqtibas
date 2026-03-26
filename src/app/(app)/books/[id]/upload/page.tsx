@@ -166,7 +166,9 @@ export default function UploadPage() {
     if (!file) return
     setImages(prev => prev.map(i => i.id === itemId ? { ...i, uploadStatus: 'uploading' } : i))
     try {
-      const path = `${user!.id}/${bookId}/${Date.now()}_${file.name}`
+      // Sanitize filename — Arabic chars and spaces break Supabase Storage paths
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const path = `${user!.id}/${bookId}/${Date.now()}_${safeName}`
       const { error: upErr } = await supabase.storage
         .from('book-images').upload(path, file, { cacheControl: '3600', upsert: false })
       if (upErr) throw upErr
