@@ -1,5 +1,5 @@
 /* ─── GOOGLE FONTS ───────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@200;300;400;500;600;700&family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Dubai:wght@300;400;500;700&family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&display=swap');
 
 /* ─── TOKENS ─────────────────────────────────────────────── */
 :root {
@@ -35,7 +35,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { font-size: 15px; scroll-behavior: smooth; }
 body {
-  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-family: 'Dubai', sans-serif;
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
@@ -325,8 +325,8 @@ img { max-width: 100%; display: block; }
 .progress-bar-fill  { height: 100%; background: linear-gradient(90deg, var(--gold), var(--gold-soft)); border-radius: 99px; transition: width .3s ease; }
 
 /* ─── PAGE HEADER ────────────────────────────────────────── */
-.page-title   { font-size: 1.8rem; font-weight: 400; letter-spacing: -.02em; margin-bottom: 4px; }
-.page-sub     { font-size: .875rem; color: var(--text-2); }
+.page-title   { display: none; }
+.page-sub     { display: none; }
 .topbar       { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 32px; gap: 16px; flex-wrap: wrap; }
 .section-header  { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
 .section-heading { font-size: 1rem; font-weight: 600; letter-spacing: -.01em; }
@@ -1831,21 +1831,19 @@ html[dir="ltr"] .sidebar-accent-bar {
 }
 .nav-item-new.active .nav-item-icon { color: var(--gold); }
 
-/* Active indicator bar on the edge */
+/* Active indicator bar — right side for RTL, left side for LTR */
 .nav-item-new.active::before {
   content: '';
   position: absolute;
-  inset-inline-end: 0;
+  inset-inline-start: 0;
   top: 18%;
   bottom: 18%;
   width: 3px;
   background: var(--gold);
-  border-radius: 4px 0 0 4px;
+  border-radius: 4px 0 0 4px; /* rounds the exposed (inner) side for RTL right-bar */
 }
 html[dir="ltr"] .nav-item-new.active::before {
-  inset-inline-end: auto;
-  inset-inline-start: 0;
-  border-radius: 0 4px 4px 0;
+  border-radius: 0 4px 4px 0; /* rounds the exposed (inner) side for LTR left-bar */
 }
 
 /* Icon */
@@ -1853,8 +1851,8 @@ html[dir="ltr"] .nav-item-new.active::before {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
   transition: all .18s ease;
   color: var(--text-3);

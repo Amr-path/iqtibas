@@ -62,27 +62,27 @@ export default function AddKnowledgeModal({ open, onClose }: Props) {
         </div>
 
         {/* Recent Books */}
-        <div style={{ marginBottom: 32 }}>
+        <div style={{ marginBottom: 20 }}>
           <div style={{
-            fontSize: '.75rem', fontWeight: 700, letterSpacing: '.12em',
-            color: 'var(--text-3)', textTransform: 'uppercase', marginBottom: 14,
+            fontSize: '.68rem', fontWeight: 600, letterSpacing: '.1em',
+            color: 'var(--text-3)', textTransform: 'uppercase', marginBottom: 10,
           }}>{t('recentBooks_modal')}</div>
           {recentBooks.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '20px 16px', fontSize: '.85rem', color: 'var(--text-3)' }}>
+            <div style={{ padding: '12px 0', fontSize: '.8rem', color: 'var(--text-3)' }}>
               {lang === 'ar' ? 'لا توجد كتب مضافة بعد' : 'No books added yet'}
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
               {recentBooks.map(ub => (
                 <button key={ub.id} onClick={() => handleBookClick(ub.book_id)}
                   style={{
-                    background: 'var(--surface-2)', border: '1px solid var(--border)',
-                    borderRadius: 'var(--r-lg)', padding: 12, cursor: 'pointer',
+                    flex: 1, background: 'var(--surface-2)', border: '1px solid var(--border)',
+                    borderRadius: 'var(--r-md)', padding: '8px 10px', cursor: 'pointer',
                     transition: 'all var(--t)', textAlign: lang === 'ar' ? 'right' : 'left',
                   }}>
-                  <div style={{ marginBottom: 10 }}><DynamicCover title={ub.books.title} size={56} /></div>
-                  <div style={{ fontSize: '.85rem', fontWeight: 500, marginBottom: 2 }}>{ub.books.title}</div>
-                  <div style={{ fontSize: '.7rem', color: 'var(--text-3)' }}>{ub.books.author}</div>
+                  <div style={{ marginBottom: 6 }}><DynamicCover title={ub.books.title} size={36} /></div>
+                  <div style={{ fontSize: '.75rem', fontWeight: 600, marginBottom: 1, lineHeight: 1.3 }}>{ub.books.title}</div>
+                  <div style={{ fontSize: '.65rem', color: 'var(--text-3)' }}>{ub.books.author}</div>
                 </button>
               ))}
             </div>

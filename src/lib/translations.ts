@@ -45,7 +45,7 @@ export const T = {
     // Sidebar / App nav
     dashboard:      'لوحة التحكم',
     searchNav:      'ابحث عن كتاب',
-    libraryNav:     'مكتبتي',
+    libraryNav:     'المكتبة',
     quotesNav:      'كل الاقتباسات',
     settings:       'الإعدادات',
     help:           'المساعدة',
