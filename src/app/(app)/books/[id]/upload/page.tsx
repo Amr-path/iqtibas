@@ -310,10 +310,6 @@ export default function UploadPage() {
         ← {bookTitle || t('backToBook')}
       </Link>
 
-      <div style={{ marginBottom: 24 }}>
-        <div className="page-title">{t('uploadTitle')}</div>
-        <div className="page-sub">{t('uploadSub')}</div>
-      </div>
 
       {/* Drop zone */}
       <div

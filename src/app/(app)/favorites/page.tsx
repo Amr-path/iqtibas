@@ -73,18 +73,6 @@ export default function FavoritesPage() {
 
   return (
     <>
-      <div style={{ marginBottom: 28 }}>
-        <div className="page-title">
-          {lang === 'ar' ? '♥ المفضلة' : '♥ Favorites'}
-        </div>
-        <div className="page-sub">
-          {loading
-            ? ''
-            : quotes.length === 0
-              ? (lang === 'ar' ? 'لا توجد اقتباسات مفضلة بعد' : 'No favorite quotes yet')
-              : (lang === 'ar' ? `${quotes.length} اقتباس في المفضلة` : `${quotes.length} favorite quote${quotes.length !== 1 ? 's' : ''}`)}
-        </div>
-      </div>
 
       {loading ? (
         <QuotesSkeleton count={5} />

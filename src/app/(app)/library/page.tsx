@@ -77,14 +77,6 @@ export default function LibraryPage() {
     <>
       {/* ── Header ── */}
       <div className="topbar" style={{ marginBottom: 24 }}>
-        <div>
-          <div className="page-title">{t('myLibraryTitle')}</div>
-          <div className="page-sub">
-            {books.length > 0
-              ? `${books.length} ${lang === 'ar' ? 'كتاب في مكتبتك' : 'books in your library'}`
-              : (lang === 'ar' ? 'مكتبتك الشخصية' : 'Your personal library')}
-          </div>
-        </div>
         <Link href="/search" className="btn btn-gold">{t('addBook')}</Link>
       </div>
 

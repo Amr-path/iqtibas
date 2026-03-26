@@ -8,9 +8,6 @@ export default function HelpPage() {
 
   return (
     <>
-      <div className="page-title" style={{ marginBottom: 32 }}>
-        {lang === 'ar' ? 'المساعدة' : 'Help'}
-      </div>
       <div style={{ maxWidth: 580, display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div className="card" style={{ padding: 32, textAlign: 'center' }}>
           <div style={{ fontSize: '2.5rem', marginBottom: 16 }}>📘</div>

@@ -80,25 +80,12 @@ export default function InboxPage() {
 
   if (loading) return (
     <>
-      <div style={{ marginBottom: 28 }}>
-        <div className="page-title">{t('inboxTitle')}</div>
-      </div>
       <InboxSkeleton count={4} />
     </>
   )
 
   return (
     <>
-      <div style={{ marginBottom: 28 }}>
-        <div className="page-title">{t('inboxTitle')}</div>
-        <div className="page-sub">
-          {books.length === 0
-            ? t('inboxEmpty')
-            : lang === 'ar'
-              ? `${books.length} كتاب بانتظار الاستخلاص`
-              : `${books.length} book${books.length !== 1 ? 's' : ''} pending`}
-        </div>
-      </div>
 
       {books.length === 0 ? (
         <div className="card">

@@ -43,7 +43,6 @@ export default function SettingsPage() {
 
   return (
     <>
-      <div className="page-title" style={{ marginBottom: 32 }}>{t('settingsTitle')}</div>
       <div style={{ maxWidth: 580, display: 'flex', flexDirection: 'column', gap: 20 }}>
 
         {/* Appearance */}

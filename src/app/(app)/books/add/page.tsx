@@ -84,10 +84,6 @@ export default function AddBookPage() {
         ← {ar ? 'المكتبة' : 'Library'}
       </Link>
 
-      <div style={{ marginBottom: 28 }}>
-        <div className="page-title">{ar ? 'إضافة كتاب جديد' : 'Add New Book'}</div>
-        <div className="page-sub">{ar ? 'أدخل معلومات الكتاب' : 'Enter book details'}</div>
-      </div>
 
       <form onSubmit={handleSubmit} style={{ maxWidth: 520 }}>
         <div className="card" style={{ padding: '28px 28px', display: 'flex', flexDirection: 'column', gap: 20 }}>
