@@ -177,11 +177,14 @@ export default function UploadPage() {
     }
   }
 
-  /* ── OCR from storagePath — delegates to server-side API (no client CORS issues) ── */
+  /* ── OCR from storagePath:
+       Server fetches image + runs Gemini (no CORS).
+       Client saves the text to DB (has user session → satisfies RLS). ── */
   async function runOcrFromStoragePath(itemId: string, storagePath: string, dbImageId?: string) {
     if (!storagePath || !dbImageId) return
     setImages(prev => prev.map(i => i.id === itemId ? { ...i, ocrStatus: 'scanning' } : i))
     try {
+      // 1. Server extracts text (handles image fetch + Gemini)
       const res  = await fetch('/api/ocr-background', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageId: dbImageId, storagePath }),
@@ -189,6 +192,16 @@ export default function UploadPage() {
       const json = await res.json() as { text?: string; error?: string; detail?: string }
       if (!res.ok) throw new Error(json.detail || json.error || `HTTP ${res.status}`)
       const text = json.text ?? ''
+
+      // 2. Client saves to DB with user's authenticated session (satisfies RLS)
+      const { error: dbErr } = await supabase.from('extracted_texts').upsert({
+        image_id:     dbImageId,
+        full_text:    text,
+        ocr_provider: 'gemini',
+        extracted_at: new Date().toISOString(),
+      }, { onConflict: 'image_id' })
+      if (dbErr) console.error('extracted_texts save error:', dbErr.message)
+
       setImages(prev => prev.map(i =>
         i.id === itemId ? { ...i, ocrStatus: 'done', ocrText: text } : i
       ))

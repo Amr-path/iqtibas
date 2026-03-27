@@ -47,19 +47,18 @@ export async function POST(req: NextRequest) {
     ])
     const text = result.response.text().trim()
 
-    // Save to extracted_texts using service-role key (bypasses RLS) or anon key
-    const sb = SERVICE_KEY
-      ? createClient(SUPABASE_URL, SERVICE_KEY)
-      : createClient(SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
-
-    const { error: dbErr } = await sb.from('extracted_texts').upsert({
-      image_id:     imageId,
-      full_text:    text,
-      ocr_provider: 'gemini',
-      extracted_at: new Date().toISOString(),
-    }, { onConflict: 'image_id' })
-
-    if (dbErr) throw new Error('DB upsert failed: ' + dbErr.message)
+    // If service-role key is available, save to DB server-side (bypasses RLS)
+    // Otherwise just return the text — the client will save it using user's session
+    if (SERVICE_KEY) {
+      const sb = createClient(SUPABASE_URL, SERVICE_KEY)
+      const { error: dbErr } = await sb.from('extracted_texts').upsert({
+        image_id:     imageId,
+        full_text:    text,
+        ocr_provider: 'gemini',
+        extracted_at: new Date().toISOString(),
+      }, { onConflict: 'image_id' })
+      if (dbErr) console.error('DB upsert error (service role):', dbErr.message)
+    }
 
     return NextResponse.json({ text })
   } catch (err: unknown) {
