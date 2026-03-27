@@ -149,14 +149,15 @@ export default function UploadPage() {
     const text = await serverOcr(base64)
     const imgId = dbImageId ?? images.find(i => i.id === itemId)?.dbImageId
     if (imgId) {
-      // Upsert so re-runs overwrite the old row rather than error on duplicate
-      const { error: etErr } = await supabase.from('extracted_texts').upsert({
+      // Delete any existing row first, then insert fresh (avoids unique constraint issues)
+      await supabase.from('extracted_texts').delete().eq('image_id', imgId)
+      const { error: etErr } = await supabase.from('extracted_texts').insert({
         image_id:     imgId,
         full_text:    text,
-        ocr_provider: 'google-vision',
+        ocr_provider: 'gemini',
         extracted_at: new Date().toISOString(),
-      }, { onConflict: 'image_id' })
-      if (etErr) console.error('extracted_text upsert error:', JSON.stringify(etErr))
+      })
+      if (etErr) console.error('extracted_text insert error:', JSON.stringify(etErr))
     }
     setImages(prev => prev.map(i =>
       i.id === itemId ? { ...i, ocrStatus: 'done', ocrText: text } : i
@@ -178,35 +179,43 @@ export default function UploadPage() {
   }
 
   /* ── OCR from storagePath:
-       Server fetches image + runs Gemini (no CORS).
+       Build public URL → pass to /api/ocr (server fetches + Gemini, no CORS).
        Client saves the text to DB (has user session → satisfies RLS). ── */
   async function runOcrFromStoragePath(itemId: string, storagePath: string, dbImageId?: string) {
     if (!storagePath || !dbImageId) return
     setImages(prev => prev.map(i => i.id === itemId ? { ...i, ocrStatus: 'scanning' } : i))
     try {
-      // 1. Server extracts text (handles image fetch + Gemini)
-      const res  = await fetch('/api/ocr-background', {
+      // Build the public URL (no auth needed for public bucket)
+      const { data: urlData } = supabase.storage.from('book-images').getPublicUrl(storagePath)
+      const publicUrl = urlData.publicUrl
+
+      // 1. Server fetches image + runs Gemini OCR (avoids client-side CORS)
+      const res  = await fetch('/api/ocr', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageId: dbImageId, storagePath }),
+        body: JSON.stringify({ url: publicUrl }),
       })
       const json = await res.json() as { text?: string; error?: string; detail?: string }
       if (!res.ok) throw new Error(json.detail || json.error || `HTTP ${res.status}`)
       const text = json.text ?? ''
 
       // 2. Client saves to DB with user's authenticated session (satisfies RLS)
-      const { error: dbErr } = await supabase.from('extracted_texts').upsert({
+      // First try to delete any existing row, then insert fresh
+      await supabase.from('extracted_texts').delete().eq('image_id', dbImageId)
+      const { error: dbErr } = await supabase.from('extracted_texts').insert({
         image_id:     dbImageId,
         full_text:    text,
         ocr_provider: 'gemini',
         extracted_at: new Date().toISOString(),
-      }, { onConflict: 'image_id' })
+      })
       if (dbErr) console.error('extracted_texts save error:', dbErr.message)
 
       setImages(prev => prev.map(i =>
         i.id === itemId ? { ...i, ocrStatus: 'done', ocrText: text } : i
       ))
     } catch (err) {
-      console.error('OCR from storagePath:', err)
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error('OCR from storagePath:', msg)
+      toast.error(`OCR error: ${msg.slice(0, 120)}`, { duration: 8000 })
       setImages(prev => prev.map(i => i.id === itemId ? { ...i, ocrStatus: 'error' } : i))
     }
   }
@@ -228,12 +237,6 @@ export default function UploadPage() {
         await supabase.from('images').update({
           storage_path: path, public_url: urlData.publicUrl, status: 'uploaded',
         }).eq('id', imgId)
-
-        // Trigger server-side OCR in background so text is ready even if user navigates away
-        fetch('/api/ocr-background', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageId: imgId, storagePath: path }),
-        }).catch(e => console.error('bg ocr trigger failed:', e))
       }
       setImages(prev => prev.map(i =>
         i.id === itemId ? { ...i, uploadStatus: 'done' } : i
