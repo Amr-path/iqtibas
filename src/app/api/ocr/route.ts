@@ -11,15 +11,28 @@ export async function POST(req: NextRequest) {
   }
 
   let base64: string
+  let mimeType = 'image/jpeg'
   try {
-    const body = await req.json() as { base64?: string }
-    base64 = body.base64 ?? ''
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    const body = await req.json() as { base64?: string; url?: string }
+
+    if (body.url) {
+      // Server-side fetch — no CORS restrictions
+      const imgRes = await fetch(body.url)
+      if (!imgRes.ok) throw new Error(`Image fetch failed: ${imgRes.status}`)
+      const contentType = imgRes.headers.get('content-type') || 'image/jpeg'
+      mimeType = contentType.split(';')[0].trim()
+      const arrayBuf = await imgRes.arrayBuffer()
+      base64 = Buffer.from(arrayBuf).toString('base64')
+    } else {
+      base64 = body.base64 ?? ''
+    }
+  } catch (fetchErr: unknown) {
+    const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr)
+    return NextResponse.json({ error: 'Failed to load image', detail: msg }, { status: 400 })
   }
 
   if (!base64) {
-    return NextResponse.json({ error: 'Missing base64 field' }, { status: 400 })
+    return NextResponse.json({ error: 'Missing base64 or url field' }, { status: 400 })
   }
 
   try {
@@ -29,7 +42,7 @@ export async function POST(req: NextRequest) {
     const result = await model.generateContent([
       {
         inlineData: {
-          mimeType: 'image/jpeg',
+          mimeType,
           data: base64,
         },
       },

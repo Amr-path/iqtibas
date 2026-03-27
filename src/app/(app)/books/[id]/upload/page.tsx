@@ -175,16 +175,29 @@ export default function UploadPage() {
     }
   }
 
-  /* ── OCR from URL (existing DB images with no extracted text) ── */
+  /* ── OCR from URL — server fetches the image to avoid browser CORS ── */
   async function runOcrFromUrl(itemId: string, url: string, dbImageId?: string) {
     if (!url) return
     setImages(prev => prev.map(i => i.id === itemId ? { ...i, ocrStatus: 'scanning' } : i))
     try {
-      const resp = await fetch(url)
-      const blob = await resp.blob()
-      const file = new File([blob], 'image.jpg', { type: blob.type || 'image/jpeg' })
-      const base64 = await imageToBase64(file)
-      await runOcrBase64(itemId, base64, dbImageId)
+      const res  = await fetch('/api/ocr', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      })
+      const json = await res.json() as { text?: string; error?: string; detail?: string }
+      if (!res.ok) throw new Error(json.detail || json.error || `HTTP ${res.status}`)
+      const text = json.text ?? ''
+      if (dbImageId) {
+        await supabase.from('extracted_texts').upsert({
+          image_id:     dbImageId,
+          full_text:    text,
+          ocr_provider: 'google-vision',
+          extracted_at: new Date().toISOString(),
+        }, { onConflict: 'image_id' })
+      }
+      setImages(prev => prev.map(i =>
+        i.id === itemId ? { ...i, ocrStatus: 'done', ocrText: text } : i
+      ))
     } catch (err) {
       console.error('OCR from URL:', err)
       setImages(prev => prev.map(i => i.id === itemId ? { ...i, ocrStatus: 'error' } : i))
