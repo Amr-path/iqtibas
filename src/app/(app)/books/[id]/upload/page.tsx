@@ -16,6 +16,7 @@ interface ImageItem {
   id:            string
   file?:         File        // absent for pre-loaded images from DB
   preview:       string      // local blob URL or public storage URL
+  storagePath?:  string      // Supabase storage path for DB images (used for re-OCR)
   ocrStatus:     OcrStatus
   uploadStatus:  UploadStatus
   uploadError?:  string      // human-readable error message when uploadStatus='error'
@@ -116,6 +117,7 @@ export default function UploadPage() {
         pending.push({
           id:           `existing_${img.id}`,
           preview:      previewUrl,
+          storagePath:  img.storage_path || undefined,
           ocrStatus:    hasExtracted ? 'done' : 'idle',
           uploadStatus: 'done',
           dbImageId:    img.id,
@@ -132,9 +134,9 @@ export default function UploadPage() {
         })
         // Auto-trigger OCR for any image that has no extracted text yet
         for (const item of pending) {
-          if (item.ocrStatus === 'idle' && item.preview) {
+          if (item.ocrStatus === 'idle' && (item.storagePath || item.preview)) {
             // Small stagger to avoid hitting the API simultaneously
-            setTimeout(() => runOcrFromUrl(item.id, item.preview, item.dbImageId), 300)
+            setTimeout(() => runOcrFromStoragePath(item.id, item.storagePath ?? '', item.dbImageId), 300)
           }
         }
       }
@@ -175,17 +177,11 @@ export default function UploadPage() {
     }
   }
 
-  /* ── OCR from URL — downloads via Supabase SDK (handles auth/CORS) ── */
-  async function runOcrFromUrl(itemId: string, url: string, dbImageId?: string) {
-    if (!url) return
+  /* ── OCR from storagePath — uses Supabase SDK download directly ── */
+  async function runOcrFromStoragePath(itemId: string, storagePath: string, dbImageId?: string) {
+    if (!storagePath) return
     setImages(prev => prev.map(i => i.id === itemId ? { ...i, ocrStatus: 'scanning' } : i))
     try {
-      // Extract storage path from public URL:
-      // https://xxx.supabase.co/storage/v1/object/public/book-images/{storagePath}
-      const match = url.match(/\/object\/(?:public|sign)\/book-images\/(.+?)(?:\?|$)/)
-      if (!match) throw new Error('Cannot parse storage path from URL: ' + url)
-      const storagePath = decodeURIComponent(match[1])
-
       const { data: blob, error: dlErr } = await supabase.storage
         .from('book-images').download(storagePath)
       if (dlErr || !blob) throw dlErr ?? new Error('Download returned empty')
@@ -194,7 +190,7 @@ export default function UploadPage() {
       const base64 = await imageToBase64(file)
       await runOcrBase64(itemId, base64, dbImageId)
     } catch (err) {
-      console.error('OCR from URL:', err)
+      console.error('OCR from storagePath:', err)
       setImages(prev => prev.map(i => i.id === itemId ? { ...i, ocrStatus: 'error' } : i))
     }
   }
@@ -216,6 +212,12 @@ export default function UploadPage() {
         await supabase.from('images').update({
           storage_path: path, public_url: urlData.publicUrl, status: 'uploaded',
         }).eq('id', imgId)
+
+        // Trigger server-side OCR in background so text is ready even if user navigates away
+        fetch('/api/ocr-background', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageId: imgId, storagePath: path }),
+        }).catch(e => console.error('bg ocr trigger failed:', e))
       }
       setImages(prev => prev.map(i =>
         i.id === itemId ? { ...i, uploadStatus: 'done' } : i
@@ -461,7 +463,7 @@ export default function UploadPage() {
                 onRemovePending={idx => removePending(img.id, idx)}
                 onRetryOcr={() => img.file
                   ? runOcr(img.id, img.file, img.dbImageId)
-                  : runOcrFromUrl(img.id, img.preview, img.dbImageId)}
+                  : runOcrFromStoragePath(img.id, img.storagePath ?? '', img.dbImageId)}
                 onTextEdit={newText => setImages(prev => prev.map(i => i.id === img.id ? { ...i, ocrText: newText } : i))}
               />
             ))}
