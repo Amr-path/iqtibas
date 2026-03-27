@@ -20,7 +20,6 @@ export default function LibraryPage() {
   const t = useT(lang)
   const [books, setBooks]     = useState<UserBook[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch]   = useState('')
   const [sort, setSort]       = useState<SortKey>('date')
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
@@ -59,48 +58,18 @@ export default function LibraryPage() {
 
   const filtered = useMemo(() => {
     let list = books
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      list = list.filter(b =>
-        b.books.title.toLowerCase().includes(q) ||
-        b.books.author?.toLowerCase().includes(q)
-      )
-    }
     if (sort === 'name')   list = [...list].sort((a, b) => a.books.title.localeCompare(b.books.title))
     if (sort === 'quotes') list = [...list].sort((a, b) => b.quotes_count - a.quotes_count)
     return list
-  }, [books, search, sort])
+  }, [books, sort])
 
   const deleteTarget = books.find(b => b.id === deleteId)
 
   return (
     <>
-      {/* ── Header ── */}
-      <div className="topbar" style={{ marginBottom: 24 }}>
-        <Link href="/search" className="btn btn-gold">{t('addBook')}</Link>
-      </div>
-
-      {/* ── Filter bar ── */}
+      {/* ── Sort bar ── */}
       {!loading && books.length > 0 && (
-        <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* Search */}
-          <div style={{ position: 'relative', flex: '1 1 180px', minWidth: 180 }}>
-            <svg style={{ position: 'absolute', insetInlineEnd: 12, top: '50%', transform: 'translateY(-50%)', opacity: .4, pointerEvents: 'none' }}
-              width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-            </svg>
-            <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder={lang === 'ar' ? 'ابحث في مكتبتك...' : 'Search your library...'}
-              dir="rtl"
-              style={{
-                width: '100%', padding: '9px 34px 9px 12px', borderRadius: 'var(--r-md)',
-                border: '1px solid var(--border)', background: 'var(--surface)',
-                fontSize: '.88rem', fontFamily: 'inherit', color: 'var(--text)',
-                outline: 'none', transition: 'border-color var(--t)', direction: 'rtl',
-              }}
-            />
-          </div>
-          {/* Sort */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
           {([['date', lang === 'ar' ? 'الأحدث' : 'Latest'],
              ['name', lang === 'ar' ? 'الاسم' : 'Name'],
              ['quotes', lang === 'ar' ? 'الأكثر اقتباسات' : 'Most Quotes']] as [SortKey, string][]).map(([key, label]) => (
@@ -124,11 +93,6 @@ export default function LibraryPage() {
             <div className="empty-sub" style={{ marginBottom: 24 }}>{t('emptyLibSub')}</div>
             <Link href="/search" className="btn btn-gold">{t('emptyLibBtn')}</Link>
           </div>
-        </div>
-      ) : filtered.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-3)' }}>
-          <div style={{ fontSize: '1.5rem', marginBottom: 8 }}>🔍</div>
-          <div>{lang === 'ar' ? `لا نتائج لـ "${search}"` : `No results for "${search}"`}</div>
         </div>
       ) : (
         <div className="lib-grid">
