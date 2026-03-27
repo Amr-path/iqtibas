@@ -28,19 +28,15 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Use service-role or anon key to download from storage
-    const sb = SERVICE_KEY
-      ? createClient(SUPABASE_URL, SERVICE_KEY)
-      : createClient(SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+    // Build public URL directly — works for any public bucket without RLS
+    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/book-images/${storagePath}`
+    const imgRes = await fetch(publicUrl)
+    if (!imgRes.ok) throw new Error(`Image fetch failed: ${imgRes.status} — ${publicUrl}`)
 
-    const { data: blob, error: dlErr } = await sb.storage
-      .from('book-images').download(storagePath)
-    if (dlErr || !blob) throw new Error('Storage download failed: ' + (dlErr?.message ?? 'empty'))
-
-    // Convert to base64
-    const arrayBuf = await blob.arrayBuffer()
-    const base64   = Buffer.from(arrayBuf).toString('base64')
-    const mimeType = blob.type || 'image/jpeg'
+    const contentType = imgRes.headers.get('content-type') || 'image/jpeg'
+    const mimeType    = contentType.split(';')[0].trim()
+    const arrayBuf    = await imgRes.arrayBuffer()
+    const base64      = Buffer.from(arrayBuf).toString('base64')
 
     // Run Gemini OCR
     const genAI  = new GoogleGenerativeAI(GEMINI_KEY)
@@ -51,7 +47,11 @@ export async function POST(req: NextRequest) {
     ])
     const text = result.response.text().trim()
 
-    // Save to extracted_texts (upsert in case it already exists)
+    // Save to extracted_texts using service-role key (bypasses RLS) or anon key
+    const sb = SERVICE_KEY
+      ? createClient(SUPABASE_URL, SERVICE_KEY)
+      : createClient(SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+
     const { error: dbErr } = await sb.from('extracted_texts').upsert({
       image_id:     imageId,
       full_text:    text,

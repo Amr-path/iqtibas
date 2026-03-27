@@ -177,18 +177,21 @@ export default function UploadPage() {
     }
   }
 
-  /* ── OCR from storagePath — uses Supabase SDK download directly ── */
+  /* ── OCR from storagePath — delegates to server-side API (no client CORS issues) ── */
   async function runOcrFromStoragePath(itemId: string, storagePath: string, dbImageId?: string) {
-    if (!storagePath) return
+    if (!storagePath || !dbImageId) return
     setImages(prev => prev.map(i => i.id === itemId ? { ...i, ocrStatus: 'scanning' } : i))
     try {
-      const { data: blob, error: dlErr } = await supabase.storage
-        .from('book-images').download(storagePath)
-      if (dlErr || !blob) throw dlErr ?? new Error('Download returned empty')
-
-      const file   = new File([blob], 'image.jpg', { type: blob.type || 'image/jpeg' })
-      const base64 = await imageToBase64(file)
-      await runOcrBase64(itemId, base64, dbImageId)
+      const res  = await fetch('/api/ocr-background', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageId: dbImageId, storagePath }),
+      })
+      const json = await res.json() as { text?: string; error?: string; detail?: string }
+      if (!res.ok) throw new Error(json.detail || json.error || `HTTP ${res.status}`)
+      const text = json.text ?? ''
+      setImages(prev => prev.map(i =>
+        i.id === itemId ? { ...i, ocrStatus: 'done', ocrText: text } : i
+      ))
     } catch (err) {
       console.error('OCR from storagePath:', err)
       setImages(prev => prev.map(i => i.id === itemId ? { ...i, ocrStatus: 'error' } : i))
