@@ -124,23 +124,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* TOPBAR */}
       <header className="app-topbar">
         <div className="app-topbar-logo">
-          {lang === 'ar' ? (
-            <svg viewBox="0 0 120 32" height="28" width="auto" style={{ display: 'block', overflow: 'visible' }} aria-label="اقتباس">
-              <text x="118" y="24" textAnchor="end" direction="rtl"
-                fontFamily="'IBM Plex Sans Arabic', 'Segoe UI', Arial, sans-serif"
-                fontSize="22" letterSpacing="-0.5">
-                <tspan fontWeight="300" fill="#2d2318">اقت</tspan><tspan fontWeight="500" fill="#D4AF37">باس</tspan>
-              </text>
-            </svg>
-          ) : (
-            <svg viewBox="0 0 120 32" height="28" width="auto" style={{ display: 'block', overflow: 'visible' }} aria-label="Iqtibas">
-              <text x="2" y="24" textAnchor="start"
-                fontFamily="'IBM Plex Sans Arabic', 'Segoe UI', Arial, sans-serif"
-                fontSize="22" letterSpacing="-0.5">
-                <tspan fontWeight="300" fill="#2d2318">Iqt</tspan><tspan fontWeight="500" fill="#D4AF37">ibas</tspan>
-              </text>
-            </svg>
-          )}
+          {lang === 'ar' ? <>اقت<span>باس</span></> : <>Iqt<span>ibas</span></>}
         </div>
         <div className="app-topbar-search">
           <GlobalSearch />

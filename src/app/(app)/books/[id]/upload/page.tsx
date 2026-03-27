@@ -175,29 +175,24 @@ export default function UploadPage() {
     }
   }
 
-  /* ── OCR from URL — server fetches the image to avoid browser CORS ── */
+  /* ── OCR from URL — downloads via Supabase SDK (handles auth/CORS) ── */
   async function runOcrFromUrl(itemId: string, url: string, dbImageId?: string) {
     if (!url) return
     setImages(prev => prev.map(i => i.id === itemId ? { ...i, ocrStatus: 'scanning' } : i))
     try {
-      const res  = await fetch('/api/ocr', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      })
-      const json = await res.json() as { text?: string; error?: string; detail?: string }
-      if (!res.ok) throw new Error(json.detail || json.error || `HTTP ${res.status}`)
-      const text = json.text ?? ''
-      if (dbImageId) {
-        await supabase.from('extracted_texts').upsert({
-          image_id:     dbImageId,
-          full_text:    text,
-          ocr_provider: 'google-vision',
-          extracted_at: new Date().toISOString(),
-        }, { onConflict: 'image_id' })
-      }
-      setImages(prev => prev.map(i =>
-        i.id === itemId ? { ...i, ocrStatus: 'done', ocrText: text } : i
-      ))
+      // Extract storage path from public URL:
+      // https://xxx.supabase.co/storage/v1/object/public/book-images/{storagePath}
+      const match = url.match(/\/object\/(?:public|sign)\/book-images\/(.+?)(?:\?|$)/)
+      if (!match) throw new Error('Cannot parse storage path from URL: ' + url)
+      const storagePath = decodeURIComponent(match[1])
+
+      const { data: blob, error: dlErr } = await supabase.storage
+        .from('book-images').download(storagePath)
+      if (dlErr || !blob) throw dlErr ?? new Error('Download returned empty')
+
+      const file   = new File([blob], 'image.jpg', { type: blob.type || 'image/jpeg' })
+      const base64 = await imageToBase64(file)
+      await runOcrBase64(itemId, base64, dbImageId)
     } catch (err) {
       console.error('OCR from URL:', err)
       setImages(prev => prev.map(i => i.id === itemId ? { ...i, ocrStatus: 'error' } : i))
