@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 
 export const runtime = 'nodejs'
 
-const VISION_KEY = process.env.GOOGLE_VISION_API_KEY
+const GEMINI_KEY = process.env.GEMINI_API_KEY
+
+const OCR_PROMPT = 'Extract all the text from this image exactly as it appears. Maintain the paragraph structure. Do not summarize, do not translate, and do not add any external commentary. Only output the text. Preserve line breaks. If the image contains Arabic text, return it as-is.'
 
 export async function POST(req: NextRequest) {
-  if (!VISION_KEY) {
-    return NextResponse.json({ error: 'GOOGLE_VISION_API_KEY not set' }, { status: 500 })
+  if (!GEMINI_KEY) {
+    return NextResponse.json({ error: 'GEMINI_API_KEY not set' }, { status: 500 })
   }
 
   let base64: string
@@ -36,39 +39,17 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const res = await fetch(
-      `https://vision.googleapis.com/v1/images:annotate?key=${VISION_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requests: [{
-            image: { content: base64 },
-            features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
-          }],
-        }),
-      }
-    )
-
-    if (!res.ok) {
-      const errBody = await res.text()
-      throw new Error(`Vision API ${res.status}: ${errBody.slice(0, 300)}`)
-    }
-
-    const data = await res.json() as {
-      responses: Array<{
-        fullTextAnnotation?: { text: string }
-        error?: { message: string }
-      }>
-    }
-
-    const response = data.responses?.[0]
-    if (response?.error) throw new Error(response.error.message)
-    const text = (response?.fullTextAnnotation?.text ?? '').trim()
+    const genAI = new GoogleGenerativeAI(GEMINI_KEY)
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+    const result = await model.generateContent([
+      { inlineData: { mimeType, data: base64 } },
+      { text: OCR_PROMPT },
+    ])
+    const text = result.response.text().trim()
 
     return NextResponse.json({ text })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)
-    return NextResponse.json({ error: 'Vision OCR failed', detail: message }, { status: 500 })
+    return NextResponse.json({ error: 'Gemini OCR failed', detail: message }, { status: 500 })
   }
 }

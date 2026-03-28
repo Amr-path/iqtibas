@@ -53,10 +53,10 @@ export async function POST(req: NextRequest) {
 
     // Run Gemini OCR
     const genAI  = new GoogleGenerativeAI(GEMINI_KEY)
-    const model  = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    const model  = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
     const result = await model.generateContent([
       { inlineData: { mimeType, data: base64 } },
-      { text: 'Extract all the text from this image exactly as it appears. Maintain the paragraph structure. Do not summarize, do not translate, and do not add any external commentary. Only output the text. Preserve line breaks.' },
+      { text: 'Extract all the text from this image exactly as it appears. Maintain the paragraph structure. Do not summarize, do not translate, and do not add any external commentary. Only output the text. Preserve line breaks. If the image contains Arabic text, return it as-is.' },
     ])
     const text = result.response.text().trim()
 
