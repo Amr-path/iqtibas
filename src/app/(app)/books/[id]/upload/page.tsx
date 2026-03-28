@@ -613,7 +613,7 @@ function ImageCard({ img, lang, onRemove, onAddPending, onRemovePending, onRetry
       <div style={{ display: 'flex', flexDirection: 'row', minHeight: 220 }}>
 
         {/* Preview — right side (first child = right in RTL) */}
-        <div style={{ position: 'relative', width: 190, flexShrink: 0, background: 'var(--surface-2)' }}>
+        <div style={{ position: 'relative', width: '50%', flexShrink: 0, background: 'var(--surface-2)', minHeight: 350 }}>
           {img.preview ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={img.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: 'var(--surface-2)' }} />
@@ -641,8 +641,8 @@ function ImageCard({ img, lang, onRemove, onAddPending, onRemovePending, onRetry
           }}>✕</button>
         </div>
 
-        {/* Content */}
-        <div style={{ flex: 1, padding: '14px 18px 18px', display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
+        {/* Content — takes remaining 50% */}
+        <div style={{ flex: 1, padding: '14px 18px 18px', display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0, width: '50%' }}>
 
           {/* Status */}
           <div style={{ fontSize: '.72rem', fontWeight: 500 }}>
@@ -661,7 +661,7 @@ function ImageCard({ img, lang, onRemove, onAddPending, onRemovePending, onRetry
 
           {/* OCR textarea + always-visible add button */}
           {(hasText || img.ocrStatus === 'error') && (
-            <div style={{ position: 'relative', paddingBottom: 36 }}>
+            <div style={{ position: 'relative', paddingBottom: 36, flex: 1, display: 'flex', flexDirection: 'column' }}>
               <textarea
                 ref={textareaRef}
                 value={img.ocrText}
@@ -675,7 +675,7 @@ function ImageCard({ img, lang, onRemove, onAddPending, onRemovePending, onRetry
                   borderRadius: 'var(--r-md)',
                   fontSize: '.88rem', lineHeight: 1.9,
                   color: 'var(--text)', direction: 'rtl',
-                  resize: 'vertical', minHeight: 140,
+                  resize: 'vertical', minHeight: 280, flex: 1,
                   width: '100%', boxSizing: 'border-box',
                   fontFamily: 'inherit', outline: 'none',
                 }}
