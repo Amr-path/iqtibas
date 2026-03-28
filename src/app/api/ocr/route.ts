@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const genAI = new GoogleGenerativeAI(GEMINI_KEY)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite-preview-06-17' })
     const result = await model.generateContent([
       { inlineData: { mimeType, data: base64 } },
       { text: OCR_PROMPT },
