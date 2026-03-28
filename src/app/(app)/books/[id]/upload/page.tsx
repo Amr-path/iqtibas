@@ -241,6 +241,16 @@ export default function UploadPage() {
       setImages(prev => prev.map(i =>
         i.id === itemId ? { ...i, uploadStatus: 'done' } : i
       ))
+
+      // Fire background OCR (server-side, saves to DB independently of client)
+      // This ensures text is extracted even if the user navigates away
+      if (imgId) {
+        fetch('/api/ocr-background', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageId: imgId, storagePath: path }),
+        }).catch(() => {}) // fire and forget
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message
         : (typeof err === 'object' && err !== null && 'message' in err)

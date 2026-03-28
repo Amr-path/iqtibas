@@ -28,6 +28,19 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // Skip if text was already extracted (e.g. client-side OCR finished first)
+    if (SERVICE_KEY) {
+      const sb = createClient(SUPABASE_URL, SERVICE_KEY)
+      const { data: existing } = await sb
+        .from('extracted_texts')
+        .select('image_id')
+        .eq('image_id', imageId)
+        .maybeSingle()
+      if (existing) {
+        return NextResponse.json({ text: '', skipped: true })
+      }
+    }
+
     // Build public URL directly — works for any public bucket without RLS
     const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/book-images/${storagePath}`
     const imgRes = await fetch(publicUrl)
