@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 const PROTECTED = ['/dashboard', '/inbox', '/library', '/quotes', '/settings', '/help', '/books']
 const AUTH_ONLY  = ['/login', '/signup']
 
-export async function middleware(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })
 
   const supabase = createServerClient(
