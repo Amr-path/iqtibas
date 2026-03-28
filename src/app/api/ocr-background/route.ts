@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { createClient } from '@supabase/supabase-js'
 
 export const runtime = 'nodejs'
 
 const GEMINI_KEY   = process.env.GEMINI_API_KEY
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-// Service-role key bypasses RLS so we can write extracted_texts from server
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY
+const MODEL = 'gemini-2.5-flash-lite-preview-06-17'
+const OCR_PROMPT = 'Extract all the text from this image exactly as it appears. Maintain the paragraph structure. Do not summarize, do not translate, and do not add any external commentary. Only output the text. Preserve line breaks. If the image contains Arabic text, return it as-is.'
 
 export async function POST(req: NextRequest) {
   if (!GEMINI_KEY) {
@@ -51,17 +51,34 @@ export async function POST(req: NextRequest) {
     const arrayBuf    = await imgRes.arrayBuffer()
     const base64      = Buffer.from(arrayBuf).toString('base64')
 
-    // Run Gemini OCR
-    const genAI  = new GoogleGenerativeAI(GEMINI_KEY)
-    const model  = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite-preview-06-17' })
-    const result = await model.generateContent([
-      { inlineData: { mimeType, data: base64 } },
-      { text: 'Extract all the text from this image exactly as it appears. Maintain the paragraph structure. Do not summarize, do not translate, and do not add any external commentary. Only output the text. Preserve line breaks. If the image contains Arabic text, return it as-is.' },
-    ])
-    const text = result.response.text().trim()
+    // Run Gemini OCR via REST API
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { inline_data: { mime_type: mimeType, data: base64 } },
+              { text: OCR_PROMPT },
+            ],
+          }],
+        }),
+      }
+    )
 
-    // If service-role key is available, save to DB server-side (bypasses RLS)
-    // Otherwise just return the text — the client will save it using user's session
+    if (!geminiRes.ok) {
+      const errBody = await geminiRes.text()
+      throw new Error(`Gemini API ${geminiRes.status}: ${errBody.slice(0, 300)}`)
+    }
+
+    const data = await geminiRes.json() as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+    }
+    const text = (data.candidates?.[0]?.content?.parts?.[0]?.text ?? '').trim()
+
+    // Save to DB server-side (bypasses RLS)
     if (SERVICE_KEY) {
       const sb = createClient(SUPABASE_URL, SERVICE_KEY)
       const { error: dbErr } = await sb.from('extracted_texts').upsert({

@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 
 export const runtime = 'nodejs'
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY
-
+const MODEL = 'gemini-2.5-flash-lite-preview-06-17'
 const OCR_PROMPT = 'Extract all the text from this image exactly as it appears. Maintain the paragraph structure. Do not summarize, do not translate, and do not add any external commentary. Only output the text. Preserve line breaks. If the image contains Arabic text, return it as-is.'
 
 export async function POST(req: NextRequest) {
@@ -18,7 +17,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json() as { base64?: string; url?: string }
 
     if (body.url) {
-      // Server-side fetch — no CORS restrictions
       const imgRes = await fetch(body.url)
       if (!imgRes.ok) throw new Error(`Image fetch failed: ${imgRes.status} — ${body.url}`)
       const contentType = imgRes.headers.get('content-type') || 'image/jpeg'
@@ -39,13 +37,31 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(GEMINI_KEY)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite-preview-06-17' })
-    const result = await model.generateContent([
-      { inlineData: { mimeType, data: base64 } },
-      { text: OCR_PROMPT },
-    ])
-    const text = result.response.text().trim()
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { inline_data: { mime_type: mimeType, data: base64 } },
+              { text: OCR_PROMPT },
+            ],
+          }],
+        }),
+      }
+    )
+
+    if (!res.ok) {
+      const errBody = await res.text()
+      throw new Error(`Gemini API ${res.status}: ${errBody.slice(0, 300)}`)
+    }
+
+    const data = await res.json() as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+    }
+    const text = (data.candidates?.[0]?.content?.parts?.[0]?.text ?? '').trim()
 
     return NextResponse.json({ text })
   } catch (err: unknown) {
