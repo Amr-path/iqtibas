@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export const runtime = 'nodejs'
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY
-const MODEL = 'gemini-2.5-flash-lite-preview-06-17'
+const MODEL = 'gemini-3.1-flash-lite-preview'
 const OCR_PROMPT = 'Extract all the text from this image exactly as it appears. Maintain the paragraph structure. Do not summarize, do not translate, and do not add any external commentary. Only output the text. Preserve line breaks. If the image contains Arabic text, return it as-is.'
 
 export async function POST(req: NextRequest) {
