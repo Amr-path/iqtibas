@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useSettings } from '@/stores/settings'
 import { useT } from '@/lib/translations'
 import toast from 'react-hot-toast'
+import { dispatchStatsChanged } from '@/lib/sidebarEvents'
 import type { UserBook } from '@/types'
 
 type SortKey = 'date' | 'name' | 'quotes'
@@ -23,37 +24,44 @@ export default function LibraryPage() {
   const [sort, setSort]       = useState<SortKey>('date')
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
-  useEffect(() => {
+  async function load() {
     if (!user) return
-    async function load() {
-      // Both queries are independent — fire in parallel
-      const [{ data }, { data: quotesData }] = await Promise.all([
-        supabase.from('user_books').select('*, books(*)')
-          .eq('user_id', user!.id).order('added_at', { ascending: false }),
-        supabase.from('quotes').select('book_id').eq('user_id', user!.id),
-      ])
-      if (!data) { setLoading(false); return }
+    // Both queries are independent — fire in parallel
+    const [{ data }, { data: quotesData }] = await Promise.all([
+      supabase.from('user_books').select('*, books(*)')
+        .eq('user_id', user!.id).order('added_at', { ascending: false }),
+      supabase.from('quotes').select('book_id').eq('user_id', user!.id),
+    ])
+    if (!data) { setLoading(false); return }
 
-      const countMap = new Map<string, number>()
-      for (const q of quotesData || []) {
-        if (q.book_id) countMap.set(q.book_id, (countMap.get(q.book_id) ?? 0) + 1)
-      }
-
-      const booksWithCount = data.map(ub => ({
-        ...ub,
-        quotes_count: countMap.get(ub.book_id) ?? 0,
-      }))
-      setBooks(booksWithCount)
-      setLoading(false)
+    const countMap = new Map<string, number>()
+    for (const q of quotesData || []) {
+      if (q.book_id) countMap.set(q.book_id, (countMap.get(q.book_id) ?? 0) + 1)
     }
-    load()
-  }, [user])
+
+    const booksWithCount = data.map(ub => ({
+      ...ub,
+      quotes_count: countMap.get(ub.book_id) ?? 0,
+    }))
+    setBooks(booksWithCount)
+    setLoading(false)
+  }
+
+  useEffect(() => { if (user) load() }, [user]) // eslint-disable-line
+
+  // Re-fetch when quotes/favorites change elsewhere (e.g. after adding quotes on upload page)
+  useEffect(() => {
+    const refresh = () => load()
+    window.addEventListener('iqtibas:statsChanged', refresh)
+    return () => window.removeEventListener('iqtibas:statsChanged', refresh)
+  }, [user]) // eslint-disable-line
 
   async function handleDelete(ubId: string) {
     const { error } = await supabase.from('user_books').delete().eq('id', ubId)
     if (error) { toast.error(lang === 'ar' ? 'تعذّر حذف الكتاب' : 'Failed to delete'); return }
     setBooks(prev => prev.filter(b => b.id !== ubId))
     toast.success(lang === 'ar' ? 'تم حذف الكتاب' : 'Book deleted')
+    dispatchStatsChanged()
   }
 
   const filtered = useMemo(() => {

@@ -71,6 +71,7 @@ export default function BookDetailPage() {
     const { error } = await supabase.from('user_books').delete().eq('id', ub.id)
     if (error) { toast.error(lang === 'ar' ? 'تعذّر حذف الكتاب' : 'Failed to delete book'); return }
     toast.success(lang === 'ar' ? 'تم حذف الكتاب' : 'Book deleted')
+    dispatchStatsChanged()
     router.push('/library')
   }
 
