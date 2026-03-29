@@ -52,11 +52,14 @@ export async function POST(req: NextRequest) {
     const base64      = Buffer.from(arrayBuf).toString('base64')
 
     // Run Gemini OCR via REST API
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 30000) // 30s timeout
     const geminiRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           contents: [{
             parts: [
@@ -67,6 +70,7 @@ export async function POST(req: NextRequest) {
         }),
       }
     )
+    clearTimeout(timeout)
 
     if (!geminiRes.ok) {
       const errBody = await geminiRes.text()

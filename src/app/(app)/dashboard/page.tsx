@@ -38,10 +38,9 @@ export default function DashboardPage() {
   const [loadingMore, setLoadingMore]   = useState(false)
   const observerRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => { if (user) { loadQuotes(0, true) } }, [user]) // eslint-disable-line
-
-  // Re-fetch when quotes change elsewhere (e.g. after adding quotes on upload page)
   useEffect(() => {
+    if (user) loadQuotes(0, true)
+    // Also listen for quote changes from other pages
     const refresh = () => { if (user) loadQuotes(0, true) }
     window.addEventListener('iqtibas:statsChanged', refresh)
     return () => window.removeEventListener('iqtibas:statsChanged', refresh)

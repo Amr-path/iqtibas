@@ -37,11 +37,14 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 30000) // 30s timeout
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           contents: [{
             parts: [
@@ -52,6 +55,7 @@ export async function POST(req: NextRequest) {
         }),
       }
     )
+    clearTimeout(timeout)
 
     if (!res.ok) {
       const errBody = await res.text()

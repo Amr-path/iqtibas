@@ -26,24 +26,12 @@ export default function LibraryPage() {
 
   async function load() {
     if (!user) return
-    // Both queries are independent — fire in parallel
-    const [{ data }, { data: quotesData }] = await Promise.all([
-      supabase.from('user_books').select('*, books(*)')
-        .eq('user_id', user!.id).order('added_at', { ascending: false }),
-      supabase.from('quotes').select('book_id').eq('user_id', user!.id),
-    ])
+    // quotes_count is already stored in user_books — no need to fetch all quotes
+    const { data } = await supabase
+      .from('user_books').select('*, books(*)')
+      .eq('user_id', user!.id).order('added_at', { ascending: false })
     if (!data) { setLoading(false); return }
-
-    const countMap = new Map<string, number>()
-    for (const q of quotesData || []) {
-      if (q.book_id) countMap.set(q.book_id, (countMap.get(q.book_id) ?? 0) + 1)
-    }
-
-    const booksWithCount = data.map(ub => ({
-      ...ub,
-      quotes_count: countMap.get(ub.book_id) ?? 0,
-    }))
-    setBooks(booksWithCount)
+    setBooks(data)
     setLoading(false)
   }
 
